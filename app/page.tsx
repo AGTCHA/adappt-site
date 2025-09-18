@@ -48,6 +48,16 @@ export default function Home() {
 				</div>
 			</section>
 
+			{/* Trust logos */}
+			<section className="mx-auto max-w-7xl px-6 py-6">
+				<div className="glass rounded-2xl p-6 flex flex-wrap items-center justify-center gap-8 text-white/50 text-sm">
+					<span>Trusted by teams in banking and enterprise</span>
+					<span className="h-6 w-24 bg-white/10 rounded" />
+					<span className="h-6 w-24 bg-white/10 rounded" />
+					<span className="h-6 w-24 bg-white/10 rounded" />
+				</div>
+			</section>
+
 			{/* Consulting CTA */}
 			<section className="mx-auto max-w-7xl px-6 py-14">
 				<div className="glass rounded-3xl p-10 md:p-14 flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
@@ -58,6 +68,20 @@ export default function Home() {
 						</p>
 					</div>
 					<Link href="/services/consulting" className="btn">Consulting services</Link>
+				</div>
+			</section>
+
+			{/* Why Skopje */}
+			<section className="mx-auto max-w-7xl px-6 py-14">
+				<div className="grid md:grid-cols-2 gap-6">
+					<div className="glass rounded-2xl p-6">
+						<h3 className="text-xl font-semibold">Why Skopje</h3>
+						<p className="mt-2 text-white/70">Strategic location, strong engineering talent, and time-zone alignment with Europe enable fast collaboration and cost-effective delivery.</p>
+					</div>
+					<div className="glass rounded-2xl p-6">
+						<h3 className="text-xl font-semibold">How we partner</h3>
+						<p className="mt-2 text-white/70">Clear governance, weekly demos, and outcome-led roadmaps. We integrate with your teams and tooling.</p>
+					</div>
 				</div>
 			</section>
 

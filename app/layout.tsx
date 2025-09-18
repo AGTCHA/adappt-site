@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
+import { Analytics } from "@vercel/analytics/react";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -31,15 +32,16 @@ export default function RootLayout({
 			<body className={`${geistSans.variable} ${geistMono.variable} antialiased`}> 
 				<header className="sticky top-0 z-50 border-b border-white/10 bg-black/30 backdrop-blur-md">
 					<nav className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
-                        <Link href="/" className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded-lg" style={{ background: "linear-gradient(135deg, #1e90ff, #60a5ff)" }} />
+						<Link href="/" className="flex items-center gap-3">
+							<div className="h-8 w-8 rounded-lg" style={{ background: "linear-gradient(135deg, #1e90ff, #60a5ff)" }} />
 							<span className="text-lg font-semibold tracking-wide">A-DappT</span>
 						</Link>
 						<div className="hidden md:flex items-center gap-8 text-sm">
 							<Link href="/products/ims" className="hover:text-[var(--accent)] transition">IMS</Link>
 							<Link href="/products/compliance" className="hover:text-[var(--accent)] transition">Compliance</Link>
 							<Link href="/products/identity" className="hover:text-[var(--accent)] transition">Digital Identity</Link>
-							<Link href="/services/consulting" className="hover:text-[var(--accent)] transition">Consulting</Link>
+							<Link href="/services" className="hover:text-[var(--accent)] transition">Services</Link>
+							<Link href="/about" className="hover:text-[var(--accent)] transition">About</Link>
 							<a href="#contact" className="btn h-9 px-4">Contact</a>
 						</div>
 					</nav>
@@ -54,6 +56,7 @@ export default function RootLayout({
 						</div>
 					</div>
 				</footer>
+				<Analytics />
 			</body>
 		</html>
 	);
