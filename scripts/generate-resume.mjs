@@ -4,7 +4,7 @@ import path from "path";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const htmlPath = path.join(__dirname, "generate-resume.html");
-const outputPath = path.join(__dirname, "..", "public", "assets", "resume", "Osler_Hutson_CV_2025.pdf");
+const outputPath = path.join(__dirname, "..", "public", "assets", "resume", "Osler_Hutson_CV_2026.pdf");
 
 async function main() {
   const browser = await puppeteer.launch({ headless: true });

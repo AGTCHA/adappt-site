@@ -69,7 +69,7 @@ export default function Home() {
                 View My Work
               </Link>
               <a
-                href="/assets/resume/Osler_Hutson_CV_2025.pdf"
+                href="/assets/resume/Osler_Hutson_CV_2026.pdf"
                 download
                 className="btn-outline"
               >

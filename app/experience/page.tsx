@@ -164,7 +164,7 @@ export default function ExperiencePage() {
                     Let&apos;s Talk
                   </Link>
                   <a
-                    href="/assets/resume/Osler_Hutson_CV_2025.pdf"
+                    href="/assets/resume/Osler_Hutson_CV_2026.pdf"
                     download
                     className="btn-outline"
                   >
