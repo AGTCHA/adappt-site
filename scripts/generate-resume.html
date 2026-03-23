@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Osler Hutson — Resume</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: #1a1a1a;
+    background: #fff;
+  }
+
+  .page {
+    width: 8.5in;
+    min-height: 11in;
+    padding: 0.5in 0.6in;
+    margin: 0 auto;
+  }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, #0a1628, #0f2140);
+    color: #fff;
+    margin: -0.5in -0.6in 0;
+    padding: 0.45in 0.6in 0.4in;
+  }
+  .header h1 {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 4px;
+  }
+  .header .subtitle {
+    font-size: 13px;
+    font-weight: 500;
+    color: #60a5fa;
+    margin-bottom: 10px;
+  }
+  .header .contact {
+    font-size: 10px;
+    color: rgba(255,255,255,0.7);
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .header .contact span { white-space: nowrap; }
+  .header .contact a { color: rgba(255,255,255,0.7); text-decoration: none; }
+
+  /* Section headings */
+  h2 {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #1e90ff;
+    border-bottom: 2px solid #1e90ff;
+    padding-bottom: 4px;
+    margin-top: 20px;
+    margin-bottom: 10px;
+  }
+
+  /* Summary */
+  .summary {
+    font-size: 11px;
+    line-height: 1.6;
+    color: #333;
+    margin-top: 16px;
+    margin-bottom: 4px;
+  }
+
+  /* Skills grid */
+  .skills-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 24px;
+  }
+  .skill-row {
+    display: flex;
+    gap: 8px;
+    font-size: 10px;
+    line-height: 1.6;
+  }
+  .skill-label {
+    font-weight: 600;
+    color: #1a1a1a;
+    white-space: nowrap;
+    min-width: 110px;
+  }
+  .skill-value { color: #444; }
+
+  /* Project entries */
+  .project {
+    margin-bottom: 12px;
+  }
+  .project-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 2px;
+  }
+  .project-title {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #0f2140;
+  }
+  .project-date {
+    font-size: 9.5px;
+    color: #666;
+    white-space: nowrap;
+  }
+  .project-sub {
+    font-size: 10px;
+    font-style: italic;
+    color: #555;
+    margin-bottom: 3px;
+  }
+  .project-stats {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+  .stat {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 500;
+    background: #f0f7ff;
+    color: #1e90ff;
+    padding: 1px 6px;
+    border-radius: 3px;
+    border: 1px solid #dbeafe;
+  }
+
+  /* Bullet lists */
+  ul {
+    padding-left: 14px;
+    margin-bottom: 2px;
+  }
+  li {
+    font-size: 10px;
+    line-height: 1.55;
+    color: #333;
+    margin-bottom: 2px;
+  }
+
+  /* Experience entries */
+  .exp {
+    margin-bottom: 10px;
+  }
+  .exp-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .exp-company {
+    font-size: 11px;
+    font-weight: 700;
+    color: #0f2140;
+  }
+  .exp-date {
+    font-size: 9.5px;
+    color: #666;
+    white-space: nowrap;
+  }
+  .exp-role {
+    font-size: 10px;
+    font-weight: 500;
+    color: #555;
+    margin-bottom: 2px;
+  }
+  .exp-location {
+    font-size: 9px;
+    color: #888;
+  }
+
+  /* Education & Languages */
+  .edu-row {
+    margin-bottom: 6px;
+  }
+  .edu-name {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: #1a1a1a;
+  }
+  .edu-detail {
+    font-size: 10px;
+    color: #555;
+  }
+
+  .lang-grid {
+    display: flex;
+    gap: 20px;
+  }
+  .lang-item {
+    font-size: 10px;
+  }
+  .lang-name { font-weight: 600; color: #1a1a1a; }
+  .lang-level { color: #666; }
+
+  /* Two column layout */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 32px;
+  }
+
+  /* Page break */
+  .page-break { page-break-before: always; }
+
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page { padding: 0.5in 0.6in; margin: 0; }
+    .header { margin: -0.5in -0.6in 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <!-- HEADER -->
+  <div class="header">
+    <h1>Osler L. Hutson</h1>
+    <div class="subtitle">Full-Stack Software Engineer</div>
+    <div class="contact">
+      <span>ohutson@agentchain.io</span>
+      <span>+389 78 373 873</span>
+      <span>Skopje, North Macedonia</span>
+      <span><a href="https://github.com/AGTCHA">github.com/AGTCHA</a></span>
+      <span><a href="https://linkedin.com/in/oslerhutson">linkedin.com/in/oslerhutson</a></span>
+      <span><a href="https://a-dappt.com">a-dappt.com</a></span>
+    </div>
+  </div>
+
+  <!-- SUMMARY -->
+  <p class="summary">
+    Full-stack software engineer with 10+ years of business experience across logistics, insurance, fintech, and blockchain.
+    Most recently single-handedly built ForgeDrive — a multi-tenant SaaS platform with four interconnected web applications,
+    480,000+ lines of production code, and 1,635 releases in 86 days. Previously founded AgentChain, a purpose-built L1
+    blockchain for AI agents (go-ethereum fork, 3,951 commits). I bring a rare combination of deep technical execution and
+    real-world business acumen — I don't just build software, I understand the industries it serves. Multilingual (English,
+    German, Spanish) with 7+ years of international experience.
+  </p>
+
+  <!-- TECHNICAL SKILLS -->
+  <h2>Technical Skills</h2>
+  <div class="skills-grid">
+    <div class="skill-row">
+      <span class="skill-label">Languages:</span>
+      <span class="skill-value">TypeScript, JavaScript, Go, SQL, PLpgSQL, Solidity, HTML, CSS</span>
+    </div>
+    <div class="skill-row">
+      <span class="skill-label">Frontend:</span>
+      <span class="skill-value">React 18, Next.js 15, Vite, Tailwind CSS, Framer Motion, D3.js, Three.js</span>
+    </div>
+    <div class="skill-row">
+      <span class="skill-label">Backend:</span>
+      <span class="skill-value">Node.js, Express, REST APIs, Prisma, OpenAI API, Cron Jobs</span>
+    </div>
+    <div class="skill-row">
+      <span class="skill-label">Databases:</span>
+      <span class="skill-value">PostgreSQL, SQLite, Row-Level Security, Multi-tenant Data Isolation</span>
+    </div>
+    <div class="skill-row">
+      <span class="skill-label">Architecture:</span>
+      <span class="skill-value">Multi-tenant SaaS, Monorepo, RBAC, EVM Blockchain, Microservices</span>
+    </div>
+    <div class="skill-row">
+      <span class="skill-label">Infrastructure:</span>
+      <span class="skill-value">AWS EC2/RDS, Nginx, Docker, Kubernetes, Let's Encrypt, Vercel</span>
+    </div>
+    <div class="skill-row">
+      <span class="skill-label">Integrations:</span>
+      <span class="skill-value">Samsara Telematics, Google OAuth/Calendar, AWS SES, FMCSA/DOT</span>
+    </div>
+    <div class="skill-row">
+      <span class="skill-label">Testing/CI:</span>
+      <span class="skill-value">Playwright, Puppeteer, GitHub Actions, SSH Deployment Scripts</span>
+    </div>
+  </div>
+
+  <!-- PROJECTS -->
+  <h2>Engineering Projects</h2>
+
+  <div class="project">
+    <div class="project-header">
+      <span class="project-title">ForgeDrive — Multi-Tenant SaaS Platform</span>
+      <span class="project-date">Dec 2025 — Present</span>
+    </div>
+    <div class="project-sub">Sole developer — forgedrive.io | TAG Trans Inc.</div>
+    <div class="project-stats">
+      <span class="stat">480K+ LOC</span>
+      <span class="stat">1,635 commits</span>
+      <span class="stat">4 web apps</span>
+      <span class="stat">86 days</span>
+      <span class="stat">1,622 files</span>
+    </div>
+    <ul>
+      <li>Designed, architected, and built a complete SaaS platform for the trucking/logistics industry: four integrated web applications (TAG Hustler recruiting, Office Forge HR, Forge TMS, Forge CRM), a shared component library, and a unified Express/TypeScript backend API</li>
+      <li>Implemented multi-tenant architecture with company-scoped middleware, PostgreSQL session variables, row-level security, and granular RBAC with tab-level permissions</li>
+      <li>Integrated OpenAI across the platform for document extraction/classification (Vision API), fleet CSV smart import, corporate chat assistant, offer template generation, and CRM deal analysis</li>
+      <li>Built Samsara telematics integration for real-time GPS tracking, HOS monitoring, fuel analytics, and driver safety scoring with a Fleet Command Center dual-map dashboard</li>
+      <li>Deployed 15+ automated cron jobs: fleet-recruiter sync, safety digests, PTO accrual, shift notifications, referral bonuses, and life-event celebration emails via AWS SES</li>
+    </ul>
+  </div>
+
+  <div class="project">
+    <div class="project-header">
+      <span class="project-title">AgentChain — L1 Blockchain for AI Agents</span>
+      <span class="project-date">Jan 2021 — Present</span>
+    </div>
+    <div class="project-sub">Founder & Lead Engineer — agentchain.dev | github.com/AgentChain-dev</div>
+    <div class="project-stats">
+      <span class="stat">3,951 commits</span>
+      <span class="stat">12M+ Go LOC</span>
+      <span class="stat">Chain ID 7331</span>
+      <span class="stat">3 repos</span>
+    </div>
+    <ul>
+      <li>Forked go-ethereum v1.11.6 and replaced Ethash consensus with RandomX PoW — a CPU-friendly algorithm enabling AI agents to mine CRD tokens on any VPS without GPUs or ASICs</li>
+      <li>Built custom agent_* RPC namespace (createWallet, send, startMining) allowing AI agents to interact with the blockchain via HTTP without managing private keys</li>
+      <li>Created the AgentChain Miner (cross-platform terminal client), an OpenClaw AI skill plugin, and a React Native/Expo mobile wallet</li>
+      <li>Live production network with public RPC, bootnode infrastructure, block explorer, and documentation site</li>
+    </ul>
+  </div>
+
+  <div class="project">
+    <div class="project-header">
+      <span class="project-title">StrategyFlow — Enterprise Initiative Management</span>
+      <span class="project-date">2025</span>
+    </div>
+    <div class="project-sub">Sole developer — Kubernetes-ready enterprise platform for banks</div>
+    <div class="project-stats">
+      <span class="stat">1.47M TS LOC</span>
+      <span class="stat">25+ Prisma models</span>
+      <span class="stat">18 API routes</span>
+      <span class="stat">K8s-ready</span>
+    </div>
+    <ul>
+      <li>Built a portfolio governance platform enabling initiative lifecycle management, risk registers, health assessments, change request workflows, and benefits tracking for financial institutions</li>
+      <li>Implemented banking-specific template engine aligned to Stopanska Banka TPO rulebook with report pack generation and graph-list mapping infrastructure</li>
+      <li>Architected for enterprise deployment: Kubernetes manifests (HPA, ingress, worker), OIDC/SSO via Microsoft Graph, Docker, Azure SecretProviderClass, and GitHub Actions CI/CD</li>
+    </ul>
+  </div>
+
+  <!-- PROFESSIONAL EXPERIENCE -->
+  <h2>Professional Experience</h2>
+
+  <div class="exp">
+    <div class="exp-header">
+      <span class="exp-company">FinqUp Technology OOD</span>
+      <span class="exp-date">Aug 2024 — Aug 2025</span>
+    </div>
+    <div class="exp-role">Head of Business Development <span class="exp-location">· Skopje, North Macedonia (Remote)</span></div>
+    <ul>
+      <li>Led business development for an AI-powered automation platform targeting financial institutions and insurers across Europe, securing €40K+ in pilot revenue and key partnerships</li>
+      <li>Translated client pain points into formalized requirements and technical specifications; managed multilingual stakeholder interactions achieving a 30% increase in qualified leads</li>
+      <li>Supported pre-seed funding of €50K through data-driven proposals, interaction diagrams, and requirements documentation</li>
+    </ul>
+  </div>
+
+  <div class="exp">
+    <div class="exp-header">
+      <span class="exp-company">AgentChain</span>
+      <span class="exp-date">Jan 2021 — Present</span>
+    </div>
+    <div class="exp-role">Founder & CEO <span class="exp-location">· Sarasota, FL (Remote)</span></div>
+    <ul>
+      <li>Founded a blockchain-powered compliance platform for the U.S. insurance industry's 1.58M agents; oversaw a cross-functional team of 6 in agile development to deliver an MVP with 100 active daily users</li>
+      <li>Evolved the platform into a purpose-built L1 blockchain (see Engineering Projects above), personally engineering the core blockchain, mining infrastructure, and AI agent integrations</li>
+    </ul>
+  </div>
+
+  <div class="exp">
+    <div class="exp-header">
+      <span class="exp-company">US Health Advisors</span>
+      <span class="exp-date">Mar 2019 — Apr 2022</span>
+    </div>
+    <div class="exp-role">Senior Insurance Agent <span class="exp-location">· Sarasota, FL</span></div>
+    <ul>
+      <li>Licensed health, accident, and life insurance agent across FL and 15+ states; generated over $800,000 in converted business through consultative sales and client relationship management</li>
+    </ul>
+  </div>
+
+  <div class="two-col">
+    <div class="exp">
+      <div class="exp-header">
+        <span class="exp-company">FTL Transportation / BMM Logistics</span>
+        <span class="exp-date">2015 — 2019</span>
+      </div>
+      <div class="exp-role">Account Executive (Freight Broker) <span class="exp-location">· Chicago, IL</span></div>
+      <ul>
+        <li>Managed freight brokerage operations: client onboarding, lane optimization, carrier negotiations, and rate analysis across national shipping networks</li>
+      </ul>
+    </div>
+    <div class="exp">
+      <div class="exp-header">
+        <span class="exp-company">NexGen Travel Distribution</span>
+        <span class="exp-date">2008 — 2015</span>
+      </div>
+      <div class="exp-role">Account Executive <span class="exp-location">· Munich, Germany</span></div>
+      <ul>
+        <li>Advanced from data management to executive role over 7 years; negotiated revenue-sharing contracts worldwide and served as liaison between clients and development teams</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- EDUCATION & LANGUAGES -->
+  <h2>Education & Languages</h2>
+  <div class="two-col">
+    <div>
+      <div class="edu-row">
+        <div class="edu-name">European University — Munich, Germany</div>
+        <div class="edu-detail">International Business Curriculum (2006 — 2009)</div>
+      </div>
+      <div class="edu-row">
+        <div class="edu-name">Cardinal Mooney High School — Sarasota, FL</div>
+        <div class="edu-detail">Graduated 2005</div>
+      </div>
+    </div>
+    <div>
+      <div class="lang-grid">
+        <div class="lang-item"><span class="lang-name">English</span> <span class="lang-level">· Native</span></div>
+        <div class="lang-item"><span class="lang-name">German</span> <span class="lang-level">· Fluent</span></div>
+        <div class="lang-item"><span class="lang-name">Spanish</span> <span class="lang-level">· Fluent</span></div>
+        <div class="lang-item"><span class="lang-name">Russian</span> <span class="lang-level">· Conversational</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

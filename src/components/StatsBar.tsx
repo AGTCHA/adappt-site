@@ -14,6 +14,9 @@ export default function StatsBar() {
   return (
     <ScrollReveal>
       <div className="glass rounded-2xl p-8 md:p-10">
+        <p className="text-xs uppercase tracking-widest text-accent-cyan/70 font-mono mb-6 text-center">
+          Most Recent Project — ForgeDrive SaaS Platform
+        </p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           {stats.map((stat) => (
             <AnimatedCounter

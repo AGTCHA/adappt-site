@@ -15,9 +15,6 @@ export default function Home() {
       {/* Hero */}
       <section className="relative min-h-[90vh] flex items-center overflow-hidden">
         <HeroCanvas />
-        {/* Ambient glow orbs */}
-        <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-accent/[0.08] rounded-full blur-[140px] pointer-events-none" />
-        <div className="absolute top-1/3 right-1/4 w-[400px] h-[400px] bg-accent-cyan/[0.06] rounded-full blur-[120px] pointer-events-none" />
         <div className="mx-auto max-w-7xl px-6 w-full relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 30 }}

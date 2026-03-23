@@ -20,15 +20,14 @@ export default function Navigation() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/[0.06] bg-[#050505]/80 backdrop-blur-xl">
       <nav className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-3 group">
-          <div
-            className="h-8 w-8 rounded-lg transition-transform group-hover:scale-110"
-            style={{
-              background: "linear-gradient(135deg, #1e90ff, #06b6d4)",
-            }}
-          />
-          <span className="text-lg font-semibold tracking-wide">
+        <Link href="/" className="flex items-center gap-2 group">
+          <span className="text-lg font-semibold tracking-wide text-white group-hover:text-white/90 transition-colors">
             Osler Hutson
+          </span>
+          <span className="text-accent-cyan text-sm font-mono">&gt;</span>
+          <span className="text-[13px] font-mono text-white/40 hidden sm:inline">
+            full-stack engineer
+            <span className="inline-block w-[2px] h-[14px] bg-accent-cyan/70 ml-0.5 align-middle animate-[blink_1s_step-end_infinite]" />
           </span>
         </Link>
 

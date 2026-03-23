@@ -1,275 +1,136 @@
 "use client";
 
-import { Canvas, useFrame, useThree, extend } from "@react-three/fiber";
-import * as THREE from "three";
-import { useMemo, useRef, useEffect, useState } from "react";
-import { shaderMaterial } from "@react-three/drei";
+import { useEffect, useRef, useState } from "react";
 
-/*
- * Custom GLSL shader: flowing liquid gradient with noise-based distortion.
- * Inspired by Stripe's mesh gradient and liquid-glass effects.
- */
-const GradientMeshMaterial = shaderMaterial(
-  {
-    uTime: 0,
-    uMouse: new THREE.Vector2(0.5, 0.5),
-    uResolution: new THREE.Vector2(1, 1),
-  },
-  /* vertex */
-  `
-    varying vec2 vUv;
-    void main() {
-      vUv = uv;
-      gl_Position = vec4(position, 1.0);
+function ParticleCanvas() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const mouseRef = useRef({ x: -1000, y: -1000 });
+  const animRef = useRef<number>(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    let w = window.innerWidth;
+    let h = window.innerHeight;
+
+    function resize() {
+      w = window.innerWidth;
+      h = window.innerHeight;
+      canvas!.width = w * dpr;
+      canvas!.height = h * dpr;
+      canvas!.style.width = w + "px";
+      canvas!.style.height = h + "px";
+      ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
-  `,
-  /* fragment */
-  `
-    precision highp float;
-    uniform float uTime;
-    uniform vec2 uMouse;
-    uniform vec2 uResolution;
-    varying vec2 vUv;
+    resize();
 
-    // Simplex-like noise
-    vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-    vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-    vec3 permute(vec3 x) { return mod289(((x * 34.0) + 1.0) * x); }
+    const handleResize = () => resize();
+    const handleMouse = (e: MouseEvent) => {
+      mouseRef.current.x = e.clientX;
+      mouseRef.current.y = e.clientY;
+    };
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("mousemove", handleMouse);
 
-    float snoise(vec2 v) {
-      const vec4 C = vec4(0.211324865405187, 0.366025403784439,
-                         -0.577350269189626, 0.024390243902439);
-      vec2 i  = floor(v + dot(v, C.yy));
-      vec2 x0 = v - i + dot(i, C.xx);
-      vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
-      vec4 x12 = x0.xyxy + C.xxzz;
-      x12.xy -= i1;
-      i = mod289(i);
-      vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0))
-                                   + i.x + vec3(0.0, i1.x, 1.0));
-      vec3 m = max(0.5 - vec3(dot(x0, x0), dot(x12.xy, x12.xy),
-                               dot(x12.zw, x12.zw)), 0.0);
-      m = m * m;
-      m = m * m;
-      vec3 x_ = 2.0 * fract(p * C.www) - 1.0;
-      vec3 h = abs(x_) - 0.5;
-      vec3 ox = floor(x_ + 0.5);
-      vec3 a0 = x_ - ox;
-      m *= 1.79284291400159 - 0.85373472095314 * (a0 * a0 + h * h);
-      vec3 g;
-      g.x  = a0.x  * x0.x  + h.x  * x0.y;
-      g.yz = a0.yz * x12.xz + h.yz * x12.yw;
-      return 130.0 * dot(m, g);
+    const COUNT = 100;
+    interface P {
+      x: number; y: number; vx: number; vy: number;
+      size: number; baseAlpha: number; hue: number;
+      life: number; maxLife: number;
     }
 
-    float fbm(vec2 p) {
-      float value = 0.0;
-      float amplitude = 0.5;
-      float frequency = 1.0;
-      for (int i = 0; i < 5; i++) {
-        value += amplitude * snoise(p * frequency);
-        amplitude *= 0.5;
-        frequency *= 2.0;
+    function spawn(): P {
+      return {
+        x: Math.random() * w, y: Math.random() * h,
+        vx: (Math.random() - 0.5) * 0.35,
+        vy: (Math.random() - 0.5) * 0.35,
+        size: 1.2 + Math.random() * 2,
+        baseAlpha: 0.15 + Math.random() * 0.35,
+        hue: 190 + Math.random() * 50,
+        life: Math.random() * 500,
+        maxLife: 400 + Math.random() * 400,
+      };
+    }
+
+    const pts: P[] = Array.from({ length: COUNT }, spawn);
+
+    let t = 0;
+    function draw() {
+      t += 0.004;
+      ctx!.clearRect(0, 0, w, h);
+
+      for (const p of pts) {
+        const fx = Math.sin(p.y * 0.002 + t * 1.8) * 0.25;
+        const fy = Math.cos(p.x * 0.002 + t * 1.4) * 0.2;
+        p.x += p.vx + fx;
+        p.y += p.vy + fy;
+        p.life++;
+        if (p.x < -30) p.x += w + 60;
+        if (p.x > w + 30) p.x -= w + 60;
+        if (p.y < -30) p.y += h + 60;
+        if (p.y > h + 30) p.y -= h + 60;
+        if (p.life > p.maxLife) Object.assign(p, spawn());
+
+        const fade = p.life < 50 ? p.life / 50
+          : p.life > p.maxLife - 50 ? (p.maxLife - p.life) / 50 : 1;
+
+        const dx = p.x - mouseRef.current.x;
+        const dy = p.y - mouseRef.current.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const glow = dist < 180 ? (1 - dist / 180) * 0.5 : 0;
+        const alpha = Math.min(1, p.baseAlpha * fade + glow);
+
+        ctx!.beginPath();
+        ctx!.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx!.fillStyle = `hsla(${p.hue}, 85%, 72%, ${alpha})`;
+        ctx!.fill();
+
+        if (p.size > 1.5) {
+          ctx!.beginPath();
+          ctx!.arc(p.x, p.y, p.size * 4, 0, Math.PI * 2);
+          ctx!.fillStyle = `hsla(${p.hue}, 80%, 60%, ${alpha * 0.06})`;
+          ctx!.fill();
+        }
       }
-      return value;
+
+      ctx!.lineWidth = 0.4;
+      for (let i = 0; i < pts.length; i++) {
+        for (let j = i + 1; j < pts.length; j++) {
+          const dx = pts[i].x - pts[j].x;
+          const dy = pts[i].y - pts[j].y;
+          const d = dx * dx + dy * dy;
+          if (d < 14400) {
+            const a = (1 - Math.sqrt(d) / 120) * 0.1;
+            ctx!.beginPath();
+            ctx!.moveTo(pts[i].x, pts[i].y);
+            ctx!.lineTo(pts[j].x, pts[j].y);
+            ctx!.strokeStyle = `hsla(205, 70%, 65%, ${a})`;
+            ctx!.stroke();
+          }
+        }
+      }
+
+      animRef.current = requestAnimationFrame(draw);
     }
+    draw();
 
-    void main() {
-      vec2 uv = vUv;
-      float aspect = uResolution.x / uResolution.y;
-      vec2 p = vec2(uv.x * aspect, uv.y);
-      float t = uTime * 0.15;
-
-      // Mouse influence: subtle pull
-      vec2 mouseInfluence = (uMouse - 0.5) * 0.3;
-
-      // Warped coordinates through noise
-      float warp1 = fbm(p * 1.2 + vec2(t * 0.7, t * 0.5) + mouseInfluence);
-      float warp2 = fbm(p * 0.8 + vec2(-t * 0.4, t * 0.6) - mouseInfluence * 0.5);
-      vec2 warped = p + vec2(warp1, warp2) * 0.4;
-
-      // Color centers that drift over time
-      vec2 c1 = vec2(0.3 + sin(t * 1.1) * 0.3, 0.4 + cos(t * 0.9) * 0.3);
-      vec2 c2 = vec2(0.7 + cos(t * 0.8) * 0.3, 0.6 + sin(t * 1.2) * 0.3);
-      vec2 c3 = vec2(0.5 + sin(t * 0.6) * 0.4, 0.3 + cos(t * 1.4) * 0.3);
-      vec2 c4 = vec2(0.4 + cos(t * 1.0) * 0.2, 0.7 + sin(t * 0.7) * 0.2);
-
-      float d1 = length(warped - c1 * vec2(aspect, 1.0));
-      float d2 = length(warped - c2 * vec2(aspect, 1.0));
-      float d3 = length(warped - c3 * vec2(aspect, 1.0));
-      float d4 = length(warped - c4 * vec2(aspect, 1.0));
-
-      vec3 col1 = vec3(0.06, 0.30, 0.70);   // Vivid deep blue
-      vec3 col2 = vec3(0.04, 0.60, 0.72);  // Bright electric cyan
-      vec3 col3 = vec3(0.40, 0.18, 0.65);  // Vibrant purple
-      vec3 col4 = vec3(0.02, 0.08, 0.18);  // Dark depth anchor
-
-      // Soft blending with noise-modulated weights
-      float w1 = 1.0 / (d1 * d1 + 0.15);
-      float w2 = 1.0 / (d2 * d2 + 0.15);
-      float w3 = 1.0 / (d3 * d3 + 0.15);
-      float w4 = 1.0 / (d4 * d4 + 0.15);
-      float wTotal = w1 + w2 + w3 + w4;
-
-      vec3 color = (col1 * w1 + col2 * w2 + col3 * w3 + col4 * w4) / wTotal;
-
-      // Secondary noise layer for additional texture
-      float detail = fbm(warped * 3.0 + t * 0.5) * 0.08;
-      color += detail;
-
-      // Subtle vignette: darken outer edges, keep center vivid
-      float vignette = 1.0 - smoothstep(0.5, 1.6, length(uv - 0.5) * 1.4);
-      color *= mix(0.3, 1.0, vignette);
-
-      // Film grain for premium feel
-      float grain = (fract(sin(dot(uv * uResolution, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.015;
-      color += grain;
-
-      gl_FragColor = vec4(color, 1.0);
-    }
-  `
-);
-
-extend({ GradientMeshMaterial });
-
-declare module "@react-three/fiber" {
-  interface ThreeElements {
-    gradientMeshMaterial: THREE.ShaderMaterial & {
-      uTime: number;
-      uMouse: THREE.Vector2;
-      uResolution: THREE.Vector2;
+    return () => {
+      cancelAnimationFrame(animRef.current);
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("mousemove", handleMouse);
     };
-  }
-}
-
-function GradientBackground() {
-  const materialRef = useRef<THREE.ShaderMaterial>(null);
-  const mouseRef = useRef(new THREE.Vector2(0.5, 0.5));
-  const targetMouse = useRef(new THREE.Vector2(0.5, 0.5));
-  const { size } = useThree();
-
-  useEffect(() => {
-    const handleMouse = (e: MouseEvent) => {
-      targetMouse.current.set(
-        e.clientX / window.innerWidth,
-        1.0 - e.clientY / window.innerHeight
-      );
-    };
-    window.addEventListener("mousemove", handleMouse);
-    return () => window.removeEventListener("mousemove", handleMouse);
   }, []);
-
-  useFrame(({ clock }) => {
-    if (!materialRef.current) return;
-    const mat = materialRef.current as THREE.ShaderMaterial & {
-      uTime: number;
-      uMouse: THREE.Vector2;
-      uResolution: THREE.Vector2;
-    };
-    mat.uTime = clock.getElapsedTime();
-
-    mouseRef.current.lerp(targetMouse.current, 0.03);
-    mat.uMouse = mouseRef.current;
-    mat.uResolution = new THREE.Vector2(size.width, size.height);
-  });
 
   return (
-    <mesh>
-      <planeGeometry args={[2, 2]} />
-      {/* @ts-expect-error custom shader material */}
-      <gradientMeshMaterial ref={materialRef} depthWrite={false} />
-    </mesh>
-  );
-}
-
-const PARTICLE_COUNT = 400;
-
-function FlowingParticles() {
-  const pointsRef = useRef<THREE.Points>(null);
-  const mouseRef = useRef({ x: 0, y: 0 });
-
-  const { positions, velocities, sizes } = useMemo(() => {
-    const pos = new Float32Array(PARTICLE_COUNT * 3);
-    const vel = new Float32Array(PARTICLE_COUNT * 3);
-    const sz = new Float32Array(PARTICLE_COUNT);
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      pos[i * 3] = (Math.random() - 0.5) * 10;
-      pos[i * 3 + 1] = (Math.random() - 0.5) * 6;
-      pos[i * 3 + 2] = (Math.random() - 0.5) * 4;
-
-      vel[i * 3] = (Math.random() - 0.5) * 0.005;
-      vel[i * 3 + 1] = (Math.random() - 0.5) * 0.005;
-      vel[i * 3 + 2] = (Math.random() - 0.5) * 0.002;
-
-      sz[i] = 0.01 + Math.random() * 0.03;
-    }
-    return { positions: pos, velocities: vel, sizes: sz };
-  }, []);
-
-  useEffect(() => {
-    const handleMouse = (e: MouseEvent) => {
-      mouseRef.current.x = (e.clientX / window.innerWidth - 0.5) * 2;
-      mouseRef.current.y = -(e.clientY / window.innerHeight - 0.5) * 2;
-    };
-    window.addEventListener("mousemove", handleMouse);
-    return () => window.removeEventListener("mousemove", handleMouse);
-  }, []);
-
-  useFrame(({ clock }) => {
-    if (!pointsRef.current) return;
-    const geo = pointsRef.current.geometry;
-    const posAttr = geo.getAttribute("position");
-    const t = clock.getElapsedTime();
-
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      const ix = i * 3;
-
-      // Flow field: sine-based drift + time
-      const x = posAttr.getX(i);
-      const y = posAttr.getY(i);
-
-      const flowX = Math.sin(y * 0.5 + t * 0.3) * 0.003 + velocities[ix];
-      const flowY = Math.cos(x * 0.5 + t * 0.2) * 0.002 + velocities[ix + 1];
-
-      let nx = x + flowX;
-      let ny = y + flowY;
-      let nz = posAttr.getZ(i) + velocities[ix + 2];
-
-      // Wrap around boundaries
-      if (nx > 5) nx = -5;
-      if (nx < -5) nx = 5;
-      if (ny > 3) ny = -3;
-      if (ny < -3) ny = 3;
-      if (nz > 2) nz = -2;
-      if (nz < -2) nz = 2;
-
-      posAttr.setXYZ(i, nx, ny, nz);
-    }
-    posAttr.needsUpdate = true;
-
-    // Subtle group rotation from mouse
-    pointsRef.current.rotation.y +=
-      (mouseRef.current.x * 0.05 - pointsRef.current.rotation.y) * 0.02;
-    pointsRef.current.rotation.x +=
-      (mouseRef.current.y * 0.03 - pointsRef.current.rotation.x) * 0.02;
-  });
-
-  return (
-    <points ref={pointsRef}>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
-        <bufferAttribute attach="attributes-size" args={[sizes, 1]} />
-      </bufferGeometry>
-      <pointsMaterial
-        color="#8ecfff"
-        size={0.028}
-        sizeAttenuation
-        transparent
-        opacity={0.6}
-        depthWrite={false}
-        blending={THREE.AdditiveBlending}
-      />
-    </points>
+    <canvas
+      ref={canvasRef}
+      className="absolute inset-0"
+      style={{ pointerEvents: "none" }}
+    />
   );
 }
 
@@ -277,19 +138,94 @@ export default function HeroCanvas() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  if (!mounted) return null;
-
   return (
-    <div className="absolute inset-0 -z-10 pointer-events-none">
-      <Canvas
-        camera={{ position: [0, 0, 1], fov: 50 }}
-        dpr={[1, 1.5]}
-        gl={{ antialias: false, powerPreference: "high-performance", alpha: true }}
-        style={{ background: "#050505" }}
-      >
-        <GradientBackground />
-        <FlowingParticles />
-      </Canvas>
+    <div className="absolute inset-0 overflow-hidden" style={{ zIndex: 0 }}>
+      {/* Base gradient layer — always visible, paints over body bg */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse 80% 60% at 20% 40%, rgba(30,144,255,0.18) 0%, transparent 70%), " +
+            "radial-gradient(ellipse 70% 50% at 75% 30%, rgba(6,182,212,0.14) 0%, transparent 70%), " +
+            "radial-gradient(ellipse 60% 50% at 50% 80%, rgba(139,92,246,0.10) 0%, transparent 70%), " +
+            "linear-gradient(180deg, #050510 0%, #030308 100%)",
+        }}
+      />
+
+      {/* Animated gradient orbs */}
+      <div className="absolute inset-0">
+        <div
+          className="absolute rounded-full"
+          style={{
+            width: 700, height: 700,
+            background: "radial-gradient(circle, rgba(30,144,255,0.35) 0%, rgba(30,144,255,0.05) 50%, transparent 70%)",
+            top: "5%", left: "10%",
+            animation: "drift1 18s ease-in-out infinite",
+            filter: "blur(60px)",
+          }}
+        />
+        <div
+          className="absolute rounded-full"
+          style={{
+            width: 600, height: 600,
+            background: "radial-gradient(circle, rgba(6,182,212,0.30) 0%, rgba(6,182,212,0.05) 50%, transparent 70%)",
+            top: "25%", right: "5%",
+            animation: "drift2 22s ease-in-out infinite",
+            filter: "blur(50px)",
+          }}
+        />
+        <div
+          className="absolute rounded-full"
+          style={{
+            width: 650, height: 650,
+            background: "radial-gradient(circle, rgba(139,92,246,0.25) 0%, rgba(139,92,246,0.04) 50%, transparent 70%)",
+            bottom: "0%", left: "30%",
+            animation: "drift3 20s ease-in-out infinite",
+            filter: "blur(70px)",
+          }}
+        />
+        <div
+          className="absolute rounded-full"
+          style={{
+            width: 500, height: 500,
+            background: "radial-gradient(circle, rgba(37,99,235,0.28) 0%, rgba(37,99,235,0.05) 50%, transparent 70%)",
+            top: "45%", left: "55%",
+            animation: "drift4 25s ease-in-out infinite",
+            filter: "blur(55px)",
+          }}
+        />
+        <div
+          className="absolute rounded-full"
+          style={{
+            width: 450, height: 450,
+            background: "radial-gradient(circle, rgba(8,145,178,0.22) 0%, transparent 60%)",
+            top: "0%", right: "25%",
+            animation: "drift5 16s ease-in-out infinite",
+            filter: "blur(45px)",
+          }}
+        />
+      </div>
+
+      {/* Canvas particle overlay */}
+      {mounted && <ParticleCanvas />}
+
+      {/* Noise grain overlay */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          opacity: 0.035,
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")`,
+          backgroundSize: "128px 128px",
+        }}
+      />
+
+      {/* Subtle top-edge glow line */}
+      <div
+        className="absolute top-0 left-0 right-0 h-px pointer-events-none"
+        style={{
+          background: "linear-gradient(90deg, transparent, rgba(30,144,255,0.3), rgba(6,182,212,0.3), transparent)",
+        }}
+      />
     </div>
   );
 }

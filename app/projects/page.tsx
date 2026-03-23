@@ -5,7 +5,7 @@ import SectionHeading from "@/components/SectionHeading";
 export const metadata: Metadata = {
   title: "Projects | Osler Hutson",
   description:
-    "Portfolio of full-stack engineering projects including ForgeDrive, a multi-tenant SaaS platform for trucking and logistics.",
+    "Portfolio of full-stack engineering projects including ForgeDrive, StrategyFlow, and AgentChain — production-grade systems built from the ground up.",
 };
 
 export default function ProjectsPage() {
@@ -14,14 +14,13 @@ export default function ProjectsPage() {
       <SectionHeading
         tag="Portfolio"
         title="Projects"
-        description="A selection of production systems I've designed, architected, and built."
+        description="Production systems I've designed, architected, and built — each solving real business problems at scale."
       />
 
       <div className="mt-12 flex flex-col gap-8">
-        {/* Featured: ForgeDrive */}
         <ProjectCard
           title="ForgeDrive — Multi-Tenant SaaS Platform"
-          description="Single-handedly designed, architected, and built a complete SaaS platform for the trucking and logistics industry encompassing four integrated web applications, a shared component library, and a unified backend API. Delivered 1,600+ production releases in under four months across 1,600+ files, totaling ~480,000 lines of production code."
+          description="Single-handedly designed, architected, and built a complete SaaS platform for the trucking and logistics industry — four integrated web applications (TAG Hustler recruiting, Office Forge HR, Forge TMS, Forge CRM), a shared component library, and a unified backend API. Delivered 1,600+ production releases in under 90 days across 1,600+ files, totaling ~480,000 lines of production code."
           href="/projects/forgedrive"
           featured
           stats={[
@@ -44,34 +43,53 @@ export default function ProjectsPage() {
           ]}
         />
 
-        {/* A-DappT IMS */}
         <ProjectCard
-          title="Initiative Management System (IMS)"
-          description="A centralized hub for banks and enterprises to orchestrate strategy, investment, delivery, and benefits — turning transformation into repeatable success. Portfolio governance, risk & compliance integration, and real-time telemetry dashboards."
-          href="/projects#ims"
+          title="StrategyFlow — Enterprise Initiative Management"
+          description="Enterprise initiative management platform designed for banks and large organizations — enabling portfolio governance, risk & compliance tracking, regulatory reporting, and strategic execution. Kubernetes-ready architecture with OIDC SSO, background job workers, and banking-specific template engines."
+          href="/projects/strategyflow"
+          featured
+          stats={[
+            { label: "TypeScript LOC", value: "1.47M" },
+            { label: "Prisma Models", value: "25+" },
+            { label: "API Routes", value: "18" },
+            { label: "Architecture", value: "K8s" },
+          ]}
           tags={[
-            "Next.js",
             "React",
             "TypeScript",
-            "PostgreSQL",
             "Prisma",
-            "Three.js",
-            "Tailwind CSS",
+            "Express",
+            "Kubernetes",
+            "Docker",
+            "Azure AKS",
+            "OIDC/SSO",
+            "Vite",
+            "GitHub Actions",
           ]}
         />
 
-        {/* A-DappT Compliance & Identity */}
         <ProjectCard
-          title="Enterprise Compliance & Digital Identity"
-          description="Compliance management systems automating policies, controls, evidence, and audits with traceability and real-time risk posture. Digital identity orchestration for customer and workforce journeys — secure, seamless, and standards-first."
-          href="/projects#compliance"
+          title="AgentChain — L1 Blockchain for AI Agents"
+          description="Purpose-built Layer 1 blockchain forked from go-ethereum with RandomX proof-of-work consensus, a custom key-free RPC namespace for AI agents, a terminal mining client, an OpenClaw AI skill plugin, and a React Native mobile wallet. Live network with CRD token, ~6s block times, and public infrastructure."
+          href="/projects/agentchain"
+          featured
+          stats={[
+            { label: "Commits", value: "3,951" },
+            { label: "Go LOC", value: "12M+" },
+            { label: "Repos", value: "3" },
+            { label: "Chain ID", value: "7331" },
+          ]}
           tags={[
-            "React",
+            "Go",
+            "C (RandomX)",
+            "Solidity",
+            "React Native",
+            "Expo",
             "TypeScript",
-            "Node.js",
-            "PostgreSQL",
-            "OAuth 2.0",
-            "Security",
+            "EVM",
+            "Docker",
+            "P2P",
+            "JSON-RPC",
           ]}
         />
       </div>
