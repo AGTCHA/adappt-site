@@ -1,0 +1,27 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            APP_DIR="${{ secrets.EC2_APP_DIR || '/var/www/adappt-site' }}"
+            cd "$APP_DIR"
+            git fetch origin main
+            git reset --hard origin/main
+            npm ci
+            npm run build
+            pm2 reload deploy/ecosystem.config.cjs --env production || pm2 start deploy/ecosystem.config.cjs --env production
+            pm2 save
