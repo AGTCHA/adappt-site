@@ -41,6 +41,37 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(income, { status: 201 });
 }
 
+export async function PATCH(req: NextRequest) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = (await req.json()) as {
+    id?: number;
+    label?: string;
+    amount?: number;
+    person?: string;
+    frequency?: string;
+  };
+
+  const id = Number(body.id);
+  if (!Number.isFinite(id)) {
+    return NextResponse.json({ error: "Invalid id." }, { status: 400 });
+  }
+
+  const data: { label?: string; amount?: number; person?: string; frequency?: string } = {};
+  if (typeof body.label === "string" && body.label.trim()) data.label = body.label.trim();
+  if (Number.isFinite(Number(body.amount)) && Number(body.amount) > 0) {
+    data.amount = Number(body.amount);
+  }
+  if (typeof body.person === "string") data.person = body.person;
+  if (typeof body.frequency === "string") data.frequency = body.frequency;
+
+  const income = await prisma.income.update({ where: { id }, data });
+  return NextResponse.json(income);
+}
+
 export async function DELETE(req: NextRequest) {
   const session = await getSession();
   if (!session) {

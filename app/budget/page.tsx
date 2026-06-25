@@ -1,4 +1,5 @@
 import BudgetDashboard from "@/components/budget/BudgetDashboard";
+import { CurrencyProvider } from "@/lib/currency";
 
 export const metadata = {
   title: "Family Budget | Osler Hutson",
@@ -6,5 +7,9 @@ export const metadata = {
 };
 
 export default function BudgetPage() {
-  return <BudgetDashboard />;
+  return (
+    <CurrencyProvider>
+      <BudgetDashboard />
+    </CurrencyProvider>
+  );
 }

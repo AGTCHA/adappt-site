@@ -48,6 +48,15 @@ export type Expense = {
   createdAt: string;
 };
 
+export type SavingsGoal = {
+  id: number;
+  name: string;
+  target: number;
+  saved: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type BudgetSummary = {
   totalIncome: number;
   totalExpenses: number;

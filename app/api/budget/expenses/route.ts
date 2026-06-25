@@ -45,6 +45,51 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(expense, { status: 201 });
 }
 
+export async function PATCH(req: NextRequest) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = (await req.json()) as {
+    id?: number;
+    label?: string;
+    amount?: number;
+    category?: string;
+    person?: string;
+    date?: string;
+    isRecurring?: boolean;
+  };
+
+  const id = Number(body.id);
+  if (!Number.isFinite(id)) {
+    return NextResponse.json({ error: "Invalid id." }, { status: 400 });
+  }
+
+  const data: {
+    label?: string;
+    amount?: number;
+    category?: string;
+    person?: string;
+    date?: Date;
+    isRecurring?: boolean;
+  } = {};
+
+  if (typeof body.label === "string" && body.label.trim()) data.label = body.label.trim();
+  if (Number.isFinite(Number(body.amount)) && Number(body.amount) > 0) {
+    data.amount = Number(body.amount);
+  }
+  if (typeof body.category === "string" && body.category.trim()) {
+    data.category = body.category.trim();
+  }
+  if (typeof body.person === "string") data.person = body.person;
+  if (typeof body.date === "string" && body.date) data.date = new Date(body.date);
+  if (typeof body.isRecurring === "boolean") data.isRecurring = body.isRecurring;
+
+  const expense = await prisma.expense.update({ where: { id }, data });
+  return NextResponse.json(expense);
+}
+
 export async function DELETE(req: NextRequest) {
   const session = await getSession();
   if (!session) {

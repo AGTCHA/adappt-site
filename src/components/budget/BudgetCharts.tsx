@@ -14,23 +14,24 @@ import {
 } from "recharts";
 import {
   CHART_COLORS,
-  formatCurrency,
   personLabel,
   type BudgetSummary,
 } from "@/lib/budget-types";
+import { useCurrency } from "@/lib/currency";
 
 type ChartTooltipProps = {
   active?: boolean;
   payload?: Array<{ name?: string; value?: number; payload?: { fill?: string } }>;
+  formatter: (v: number) => string;
 };
 
-function ChartTooltip({ active, payload }: ChartTooltipProps) {
+function ChartTooltip({ active, payload, formatter }: ChartTooltipProps) {
   if (!active || !payload?.length) return null;
   const item = payload[0];
   return (
     <div className="glass rounded-xl px-4 py-3 text-sm shadow-xl">
       <p className="text-white/60">{item.name}</p>
-      <p className="text-white font-semibold">{formatCurrency(item.value ?? 0)}</p>
+      <p className="text-white font-semibold">{formatter(item.value ?? 0)}</p>
     </div>
   );
 }
@@ -56,6 +57,10 @@ function categoryChartData(record: Record<string, number>) {
 }
 
 export default function BudgetCharts({ summary }: { summary: BudgetSummary }) {
+  const { format, formatCompact } = useCurrency();
+  const tooltip = (
+    <ChartTooltip formatter={format} />
+  );
   const incomeData = toChartData(summary.incomeByPerson);
   const expensePersonData = toChartData(summary.expensesByPerson);
   const categoryData = categoryChartData(summary.expensesByCategory);
@@ -85,9 +90,9 @@ export default function BudgetCharts({ summary }: { summary: BudgetSummary }) {
                 axisLine={false}
                 tickLine={false}
                 tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 12 }}
-                tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                tickFormatter={(v) => formatCompact(v)}
               />
-              <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
+              <Tooltip content={tooltip} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
               <Bar dataKey="amount" radius={[8, 8, 0, 0]}>
                 {overviewData.map((entry) => (
                   <Cell key={entry.name} fill={entry.fill} />
@@ -123,7 +128,7 @@ export default function BudgetCharts({ summary }: { summary: BudgetSummary }) {
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip content={<ChartTooltip />} />
+                <Tooltip content={tooltip} />
                 <Legend
                   formatter={(value) => (
                     <span className="text-white/60 text-xs">{value}</span>
@@ -160,7 +165,7 @@ export default function BudgetCharts({ summary }: { summary: BudgetSummary }) {
                     <Cell key={i} fill={CHART_COLORS[(i + 3) % CHART_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip content={<ChartTooltip />} />
+                <Tooltip content={tooltip} />
                 <Legend
                   formatter={(value) => (
                     <span className="text-white/60 text-xs">{value}</span>
@@ -185,7 +190,7 @@ export default function BudgetCharts({ summary }: { summary: BudgetSummary }) {
                   axisLine={false}
                   tickLine={false}
                   tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 12 }}
-                  tickFormatter={(v) => `$${v}`}
+                  tickFormatter={(v) => formatCompact(v)}
                 />
                 <YAxis
                   type="category"
@@ -195,7 +200,7 @@ export default function BudgetCharts({ summary }: { summary: BudgetSummary }) {
                   tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 13 }}
                   width={100}
                 />
-                <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
+                <Tooltip content={tooltip} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
                 <Bar dataKey="value" radius={[0, 8, 8, 0]} fill="#8b5cf6" />
               </BarChart>
             </ResponsiveContainer>
