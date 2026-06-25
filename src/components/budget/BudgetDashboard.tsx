@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import {
   FiPlus,
@@ -11,6 +11,10 @@ import {
   FiTrendingDown,
   FiDollarSign,
   FiPieChart,
+  FiX,
+  FiArrowUp,
+  FiArrowDown,
+  FiRepeat,
 } from "react-icons/fi";
 import BudgetCharts from "@/components/budget/BudgetCharts";
 import {
@@ -18,6 +22,8 @@ import {
   FREQUENCY_OPTIONS,
   PERSON_OPTIONS,
   formatCurrency,
+  formatDate,
+  frequencyLabel,
   monthlyAmount,
   personLabel,
   type BudgetSummary,
@@ -26,6 +32,9 @@ import {
 } from "@/lib/budget-types";
 
 type Tab = "overview" | "income" | "expenses";
+type ModalKind = null | "income" | "expense";
+type SortKey = "date" | "amount" | "label";
+type SortDir = "asc" | "desc";
 
 const inputClass =
   "w-full h-11 px-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/30 transition-all";
@@ -33,12 +42,25 @@ const inputClass =
 const selectClass =
   "w-full h-11 px-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/30 transition-all appearance-none cursor-pointer";
 
+const labelClass = "block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide";
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export default function BudgetDashboard() {
   const [tab, setTab] = useState<Tab>("overview");
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [summary, setSummary] = useState<BudgetSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState<ModalKind>(null);
+  const [saving, setSaving] = useState(false);
+
+  const [expSort, setExpSort] = useState<{ key: SortKey; dir: SortDir }>({
+    key: "date",
+    dir: "desc",
+  });
 
   const [incomeForm, setIncomeForm] = useState({
     label: "",
@@ -52,7 +74,8 @@ export default function BudgetDashboard() {
     amount: "",
     category: "Groceries",
     person: "joint",
-    isRecurring: true,
+    isRecurring: false,
+    date: todayISO(),
   });
 
   const fetchAll = useCallback(async () => {
@@ -61,7 +84,6 @@ export default function BudgetDashboard() {
       fetch("/api/budget/expenses"),
       fetch("/api/budget/summary"),
     ]);
-
     if (incRes.ok) setIncomes(await incRes.json());
     if (expRes.ok) setExpenses(await expRes.json());
     if (sumRes.ok) setSummary(await sumRes.json());
@@ -79,6 +101,7 @@ export default function BudgetDashboard() {
 
   async function addIncome(e: React.FormEvent) {
     e.preventDefault();
+    setSaving(true);
     const res = await fetch("/api/budget/income", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -89,14 +112,17 @@ export default function BudgetDashboard() {
         frequency: incomeForm.frequency,
       }),
     });
+    setSaving(false);
     if (res.ok) {
       setIncomeForm({ label: "", amount: "", person: "osler", frequency: "monthly" });
+      setModal(null);
       fetchAll();
     }
   }
 
   async function addExpense(e: React.FormEvent) {
     e.preventDefault();
+    setSaving(true);
     const res = await fetch("/api/budget/expenses", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -106,16 +132,20 @@ export default function BudgetDashboard() {
         category: expenseForm.category,
         person: expenseForm.person,
         isRecurring: expenseForm.isRecurring,
+        date: expenseForm.date,
       }),
     });
+    setSaving(false);
     if (res.ok) {
       setExpenseForm({
         label: "",
         amount: "",
         category: "Groceries",
         person: "joint",
-        isRecurring: true,
+        isRecurring: false,
+        date: todayISO(),
       });
+      setModal(null);
       fetchAll();
     }
   }
@@ -128,6 +158,26 @@ export default function BudgetDashboard() {
   async function deleteExpense(id: number) {
     await fetch(`/api/budget/expenses?id=${id}`, { method: "DELETE" });
     fetchAll();
+  }
+
+  const sortedExpenses = useMemo(() => {
+    const copy = [...expenses];
+    copy.sort((a, b) => {
+      let cmp = 0;
+      if (expSort.key === "amount") cmp = a.amount - b.amount;
+      else if (expSort.key === "label") cmp = a.label.localeCompare(b.label);
+      else cmp = new Date(a.date).getTime() - new Date(b.date).getTime();
+      return expSort.dir === "asc" ? cmp : -cmp;
+    });
+    return copy;
+  }, [expenses, expSort]);
+
+  function toggleSort(key: SortKey) {
+    setExpSort((prev) =>
+      prev.key === key
+        ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: key === "label" ? "asc" : "desc" },
+    );
   }
 
   if (loading) {
@@ -152,7 +202,7 @@ export default function BudgetDashboard() {
 
       <div className="relative mx-auto max-w-7xl px-6 py-10">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-10">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
           <div>
             <span className="tag">Family Finance</span>
             <h1 className="mt-3 text-3xl md:text-4xl font-bold text-white tracking-tight">
@@ -174,6 +224,22 @@ export default function BudgetDashboard() {
               Sign out
             </button>
           </div>
+        </div>
+
+        {/* Primary actions — always visible */}
+        <div className="flex flex-wrap gap-3 mb-8">
+          <button
+            onClick={() => setModal("income")}
+            className="flex items-center gap-2 h-11 px-5 rounded-xl bg-emerald-500/15 border border-emerald-500/25 text-emerald-300 hover:bg-emerald-500/25 font-medium text-sm transition-all"
+          >
+            <FiPlus className="w-4 h-4" /> Add Income
+          </button>
+          <button
+            onClick={() => setModal("expense")}
+            className="flex items-center gap-2 h-11 px-5 rounded-xl bg-red-500/15 border border-red-500/25 text-red-300 hover:bg-red-500/25 font-medium text-sm transition-all"
+          >
+            <FiPlus className="w-4 h-4" /> Add Expense / Payment
+          </button>
         </div>
 
         {/* Summary cards */}
@@ -211,7 +277,7 @@ export default function BudgetDashboard() {
         )}
 
         {/* Tabs */}
-        <div className="flex gap-1 mb-8 p-1 rounded-2xl bg-white/[0.03] border border-white/[0.06] w-fit">
+        <div className="flex gap-1 mb-6 p-1 rounded-2xl bg-white/[0.03] border border-white/[0.06] w-fit">
           {(["overview", "income", "expenses"] as Tab[]).map((t) => (
             <button
               key={t}
@@ -222,7 +288,7 @@ export default function BudgetDashboard() {
                   : "text-white/50 hover:text-white/80"
               }`}
             >
-              {t}
+              {t === "overview" ? "Overview" : t === "income" ? "Income" : "Expenses & Payments"}
             </button>
           ))}
         </div>
@@ -235,129 +301,276 @@ export default function BudgetDashboard() {
         )}
 
         {tab === "income" && (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="grid grid-cols-1 lg:grid-cols-5 gap-6"
-          >
-            <form onSubmit={addIncome} className="glass rounded-2xl p-6 lg:col-span-2 h-fit space-y-4">
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                <FiPlus className="text-accent-cyan" /> Add Income
-              </h3>
-              <input
-                className={inputClass}
-                placeholder="e.g. Salary, Freelance"
-                value={incomeForm.label}
-                onChange={(e) => setIncomeForm({ ...incomeForm, label: e.target.value })}
-                required
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+            {incomes.length === 0 ? (
+              <EmptyState
+                message="No income yet."
+                actionLabel="Add Income"
+                onAction={() => setModal("income")}
               />
-              <input
-                className={inputClass}
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Amount ($)"
-                value={incomeForm.amount}
-                onChange={(e) => setIncomeForm({ ...incomeForm, amount: e.target.value })}
-                required
-              />
-              <select
-                className={selectClass}
-                value={incomeForm.person}
-                onChange={(e) => setIncomeForm({ ...incomeForm, person: e.target.value })}
-              >
-                {PERSON_OPTIONS.map((p) => (
-                  <option key={p.value} value={p.value} className="bg-[#111]">
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-              <select
-                className={selectClass}
-                value={incomeForm.frequency}
-                onChange={(e) => setIncomeForm({ ...incomeForm, frequency: e.target.value })}
-              >
-                {FREQUENCY_OPTIONS.map((f) => (
-                  <option key={f.value} value={f.value} className="bg-[#111]">
-                    {f.label}
-                  </option>
-                ))}
-              </select>
-              <button type="submit" className="btn w-full">
-                Add Income
-              </button>
-            </form>
-
-            <div className="lg:col-span-3 space-y-3">
-              {incomes.length === 0 ? (
-                <EmptyState message="No income entries yet. Add your salary and other income sources." />
-              ) : (
-                incomes.map((inc) => (
-                  <EntryRow
-                    key={inc.id}
-                    title={inc.label}
-                    subtitle={`${personLabel(inc.person)} · ${inc.frequency}`}
-                    amount={formatCurrency(monthlyAmount(inc.amount, inc.frequency))}
-                    amountNote={`${formatCurrency(inc.amount)} ${inc.frequency}`}
-                    onDelete={() => deleteIncome(inc.id)}
-                    variant="income"
-                  />
-                ))
-              )}
-            </div>
+            ) : (
+              <div className="glass rounded-2xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-white/[0.06] text-white/40 text-xs uppercase tracking-wide">
+                        <Th>Source</Th>
+                        <Th>Person</Th>
+                        <Th>Frequency</Th>
+                        <Th className="text-right">Amount</Th>
+                        <Th className="text-right">Monthly equiv.</Th>
+                        <Th className="text-right">·</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {incomes.map((inc) => (
+                        <tr
+                          key={inc.id}
+                          className="border-b border-white/[0.04] hover:bg-white/[0.02] group"
+                        >
+                          <Td className="font-medium text-white">{inc.label}</Td>
+                          <Td className="text-white/60">{personLabel(inc.person)}</Td>
+                          <Td className="text-white/60">{frequencyLabel(inc.frequency)}</Td>
+                          <Td className="text-right text-white/80">
+                            {formatCurrency(inc.amount)}
+                          </Td>
+                          <Td className="text-right font-semibold text-emerald-400">
+                            {formatCurrency(monthlyAmount(inc.amount, inc.frequency))}
+                          </Td>
+                          <Td className="text-right">
+                            <DeleteBtn onClick={() => deleteIncome(inc.id)} />
+                          </Td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
 
         {tab === "expenses" && (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="grid grid-cols-1 lg:grid-cols-5 gap-6"
-          >
-            <form onSubmit={addExpense} className="glass rounded-2xl p-6 lg:col-span-2 h-fit space-y-4">
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                <FiPlus className="text-red-400" /> Add Expense
-              </h3>
-              <input
-                className={inputClass}
-                placeholder="e.g. Rent, Netflix, Gas"
-                value={expenseForm.label}
-                onChange={(e) => setExpenseForm({ ...expenseForm, label: e.target.value })}
-                required
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+            {expenses.length === 0 ? (
+              <EmptyState
+                message="No expenses or payments logged yet."
+                actionLabel="Add Expense"
+                onAction={() => setModal("expense")}
               />
-              <input
-                className={inputClass}
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Amount ($)"
-                value={expenseForm.amount}
-                onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
-                required
-              />
-              <select
-                className={selectClass}
-                value={expenseForm.category}
-                onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}
-              >
-                {EXPENSE_CATEGORIES.map((c) => (
-                  <option key={c} value={c} className="bg-[#111]">
-                    {c}
-                  </option>
-                ))}
-              </select>
-              <select
-                className={selectClass}
-                value={expenseForm.person}
-                onChange={(e) => setExpenseForm({ ...expenseForm, person: e.target.value })}
-              >
-                {PERSON_OPTIONS.map((p) => (
-                  <option key={p.value} value={p.value} className="bg-[#111]">
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-              <label className="flex items-center gap-3 cursor-pointer">
+            ) : (
+              <div className="glass rounded-2xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-white/[0.06] text-white/40 text-xs uppercase tracking-wide">
+                        <SortableTh
+                          label="Date"
+                          active={expSort.key === "date"}
+                          dir={expSort.dir}
+                          onClick={() => toggleSort("date")}
+                        />
+                        <SortableTh
+                          label="Description"
+                          active={expSort.key === "label"}
+                          dir={expSort.dir}
+                          onClick={() => toggleSort("label")}
+                        />
+                        <Th>Category</Th>
+                        <Th>Person</Th>
+                        <Th>Type</Th>
+                        <SortableTh
+                          label="Amount"
+                          align="right"
+                          active={expSort.key === "amount"}
+                          dir={expSort.dir}
+                          onClick={() => toggleSort("amount")}
+                        />
+                        <Th className="text-right">·</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedExpenses.map((exp) => (
+                        <tr
+                          key={exp.id}
+                          className="border-b border-white/[0.04] hover:bg-white/[0.02] group"
+                        >
+                          <Td className="text-white/60 whitespace-nowrap">
+                            {formatDate(exp.date)}
+                          </Td>
+                          <Td className="font-medium text-white">{exp.label}</Td>
+                          <Td>
+                            <span className="inline-block px-2 py-0.5 rounded-md bg-white/[0.05] text-white/60 text-xs">
+                              {exp.category}
+                            </span>
+                          </Td>
+                          <Td className="text-white/60">{personLabel(exp.person)}</Td>
+                          <Td>
+                            {exp.isRecurring ? (
+                              <span className="inline-flex items-center gap-1 text-accent-cyan text-xs">
+                                <FiRepeat className="w-3 h-3" /> Recurring
+                              </span>
+                            ) : (
+                              <span className="text-white/40 text-xs">One-time</span>
+                            )}
+                          </Td>
+                          <Td className="text-right font-semibold text-red-400 whitespace-nowrap">
+                            -{formatCurrency(exp.amount)}
+                          </Td>
+                          <Td className="text-right">
+                            <DeleteBtn onClick={() => deleteExpense(exp.id)} />
+                          </Td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </div>
+
+      {/* Modals */}
+      <AnimatePresence>
+        {modal === "income" && (
+          <Modal title="Add Income" onClose={() => setModal(null)}>
+            <form onSubmit={addIncome} className="space-y-4">
+              <div>
+                <label className={labelClass}>Source</label>
+                <input
+                  className={inputClass}
+                  placeholder="e.g. Salary, Freelance, Rental"
+                  value={incomeForm.label}
+                  onChange={(e) => setIncomeForm({ ...incomeForm, label: e.target.value })}
+                  required
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Amount ($)</label>
+                <input
+                  className={inputClass}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={incomeForm.amount}
+                  onChange={(e) => setIncomeForm({ ...incomeForm, amount: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelClass}>Person</label>
+                  <select
+                    className={selectClass}
+                    value={incomeForm.person}
+                    onChange={(e) => setIncomeForm({ ...incomeForm, person: e.target.value })}
+                  >
+                    {PERSON_OPTIONS.map((p) => (
+                      <option key={p.value} value={p.value} className="bg-[#111]">
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>Frequency</label>
+                  <select
+                    className={selectClass}
+                    value={incomeForm.frequency}
+                    onChange={(e) =>
+                      setIncomeForm({ ...incomeForm, frequency: e.target.value })
+                    }
+                  >
+                    {FREQUENCY_OPTIONS.map((f) => (
+                      <option key={f.value} value={f.value} className="bg-[#111]">
+                        {f.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <button type="submit" disabled={saving} className="btn w-full disabled:opacity-60">
+                {saving ? "Saving…" : "Add Income"}
+              </button>
+            </form>
+          </Modal>
+        )}
+
+        {modal === "expense" && (
+          <Modal title="Add Expense / Payment" onClose={() => setModal(null)}>
+            <form onSubmit={addExpense} className="space-y-4">
+              <div>
+                <label className={labelClass}>Description</label>
+                <input
+                  className={inputClass}
+                  placeholder="e.g. Rent, Groceries, Netflix"
+                  value={expenseForm.label}
+                  onChange={(e) => setExpenseForm({ ...expenseForm, label: e.target.value })}
+                  required
+                  autoFocus
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelClass}>Amount ($)</label>
+                  <input
+                    className={inputClass}
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={expenseForm.amount}
+                    onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Date</label>
+                  <input
+                    className={inputClass}
+                    type="date"
+                    value={expenseForm.date}
+                    onChange={(e) => setExpenseForm({ ...expenseForm, date: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelClass}>Category</label>
+                  <select
+                    className={selectClass}
+                    value={expenseForm.category}
+                    onChange={(e) =>
+                      setExpenseForm({ ...expenseForm, category: e.target.value })
+                    }
+                  >
+                    {EXPENSE_CATEGORIES.map((c) => (
+                      <option key={c} value={c} className="bg-[#111]">
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>Person</label>
+                  <select
+                    className={selectClass}
+                    value={expenseForm.person}
+                    onChange={(e) => setExpenseForm({ ...expenseForm, person: e.target.value })}
+                  >
+                    {PERSON_OPTIONS.map((p) => (
+                      <option key={p.value} value={p.value} className="bg-[#111]">
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <label className="flex items-center gap-3 cursor-pointer pt-1">
                 <input
                   type="checkbox"
                   checked={expenseForm.isRecurring}
@@ -366,33 +579,83 @@ export default function BudgetDashboard() {
                   }
                   className="w-4 h-4 rounded accent-accent"
                 />
-                <span className="text-sm text-white/60">Recurring monthly payment</span>
+                <span className="text-sm text-white/60">
+                  Recurring monthly payment (counts toward monthly budget)
+                </span>
               </label>
-              <button type="submit" className="btn w-full">
-                Add Expense
+              <button type="submit" disabled={saving} className="btn w-full disabled:opacity-60">
+                {saving ? "Saving…" : "Add Expense"}
               </button>
             </form>
-
-            <div className="lg:col-span-3 space-y-3">
-              {expenses.length === 0 ? (
-                <EmptyState message="No expenses yet. Log your bills, subscriptions, and payments." />
-              ) : (
-                expenses.map((exp) => (
-                  <EntryRow
-                    key={exp.id}
-                    title={exp.label}
-                    subtitle={`${exp.category} · ${personLabel(exp.person)}${exp.isRecurring ? " · Recurring" : ""}`}
-                    amount={formatCurrency(exp.amount)}
-                    onDelete={() => deleteExpense(exp.id)}
-                    variant="expense"
-                  />
-                ))
-              )}
-            </div>
-          </motion.div>
+          </Modal>
         )}
-      </div>
+      </AnimatePresence>
     </div>
+  );
+}
+
+function Th({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return <th className={`px-5 py-3 text-left font-medium ${className}`}>{children}</th>;
+}
+
+function SortableTh({
+  label,
+  active,
+  dir,
+  onClick,
+  align = "left",
+}: {
+  label: string;
+  active: boolean;
+  dir: SortDir;
+  onClick: () => void;
+  align?: "left" | "right";
+}) {
+  return (
+    <th className={`px-5 py-3 font-medium ${align === "right" ? "text-right" : "text-left"}`}>
+      <button
+        onClick={onClick}
+        className={`inline-flex items-center gap-1 hover:text-white/80 transition-colors ${
+          active ? "text-white/80" : ""
+        } ${align === "right" ? "flex-row-reverse" : ""}`}
+      >
+        {label}
+        {active &&
+          (dir === "asc" ? (
+            <FiArrowUp className="w-3 h-3" />
+          ) : (
+            <FiArrowDown className="w-3 h-3" />
+          ))}
+      </button>
+    </th>
+  );
+}
+
+function Td({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return <td className={`px-5 py-3.5 ${className}`}>{children}</td>;
+}
+
+function DeleteBtn({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="p-2 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 md:opacity-0 md:group-hover:opacity-100 transition-all"
+      aria-label="Delete"
+    >
+      <FiTrash2 className="w-4 h-4" />
+    </button>
   );
 }
 
@@ -415,11 +678,8 @@ function SummaryCard({
     blue: "hover:border-accent/20",
     purple: "hover:border-accent-purple/20",
   };
-
   return (
-    <div
-      className={`glass glass-hover rounded-2xl p-5 transition-all ${borderColors[accent]}`}
-    >
+    <div className={`glass glass-hover rounded-2xl p-5 transition-all ${borderColors[accent]}`}>
       <div className="flex items-center gap-3 mb-3">
         <div className="p-2 rounded-xl bg-white/[0.04]">{icon}</div>
         <span className="text-sm text-white/50">{label}</span>
@@ -430,52 +690,64 @@ function SummaryCard({
   );
 }
 
-function EntryRow({
-  title,
-  subtitle,
-  amount,
-  amountNote,
-  onDelete,
-  variant,
+function EmptyState({
+  message,
+  actionLabel,
+  onAction,
 }: {
-  title: string;
-  subtitle: string;
-  amount: string;
-  amountNote?: string;
-  onDelete: () => void;
-  variant: "income" | "expense";
+  message: string;
+  actionLabel: string;
+  onAction: () => void;
 }) {
   return (
-    <div className="glass rounded-xl px-5 py-4 flex items-center justify-between gap-4 group">
-      <div className="min-w-0">
-        <p className="text-white font-medium truncate">{title}</p>
-        <p className="text-xs text-white/40 mt-0.5">{subtitle}</p>
-      </div>
-      <div className="flex items-center gap-4 shrink-0">
-        <div className="text-right">
-          <p
-            className={`font-semibold ${variant === "income" ? "text-emerald-400" : "text-red-400"}`}
-          >
-            {variant === "income" ? "+" : "-"}{amount}
-          </p>
-          {amountNote && <p className="text-[10px] text-white/30">{amountNote}</p>}
-        </div>
-        <button
-          onClick={onDelete}
-          className="p-2 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all"
-          aria-label="Delete"
-        >
-          <FiTrash2 className="w-4 h-4" />
-        </button>
-      </div>
+    <div className="glass rounded-2xl p-12 text-center">
+      <p className="text-white/40 text-sm mb-5">{message}</p>
+      <button onClick={onAction} className="btn inline-flex items-center gap-2">
+        <FiPlus className="w-4 h-4" /> {actionLabel}
+      </button>
     </div>
   );
 }
 
-function EmptyState({ message }: { message: string }) {
+function Modal({
+  title,
+  children,
+  onClose,
+}: {
+  title: string;
+  children: React.ReactNode;
+  onClose: () => void;
+}) {
   return (
-    <div className="glass rounded-2xl p-12 text-center">
-      <p className="text-white/30 text-sm max-w-sm mx-auto">{message}</p>
-    </div>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+    >
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 12 }}
+        transition={{ duration: 0.2 }}
+        className="relative w-full max-w-md glass rounded-2xl p-6 border border-white/[0.08]"
+      >
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-lg font-semibold text-white">{title}</h3>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg text-white/40 hover:text-white hover:bg-white/[0.06] transition-all"
+            aria-label="Close"
+          >
+            <FiX className="w-5 h-5" />
+          </button>
+        </div>
+        {children}
+      </motion.div>
+    </motion.div>
   );
 }
