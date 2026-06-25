@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
-import Navigation from "@/components/Navigation";
-import Footer from "@/components/Footer";
+import AppShell from "@/components/AppShell";
 import { Analytics } from "@vercel/analytics/react";
 
 const geistSans = Geist({
@@ -51,9 +50,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} antialiased`}
       >
-        <Navigation />
-        <main className="min-h-screen pt-[72px]">{children}</main>
-        <Footer />
+        <AppShell>{children}</AppShell>
         <Analytics />
       </body>
     </html>

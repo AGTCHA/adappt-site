@@ -1,8 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSession, destroySession, verifyCredentials } from "@/lib/auth";
+import {
+  createSession,
+  destroySession,
+  isAuthConfigured,
+  verifyCredentials,
+} from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
   try {
+    if (!isAuthConfigured()) {
+      console.error("Login blocked: BUDGET_ADMIN_EMAIL and password env vars are not set");
+      return NextResponse.json(
+        { error: "Sign-in is unavailable. Please contact the administrator." },
+        { status: 503 },
+      );
+    }
+
     const body = (await req.json()) as { email?: string; password?: string };
     const email = String(body.email ?? "").trim();
     const password = String(body.password ?? "");

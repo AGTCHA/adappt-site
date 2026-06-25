@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import LoginForm from "@/components/budget/LoginForm";
 
 export const metadata = {
-  title: "Sign In | Family Budget",
+  title: "Sign In | A-DappT Portal",
   robots: { index: false, follow: false },
 };
 

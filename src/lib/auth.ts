@@ -13,16 +13,43 @@ function getSecret() {
   return new TextEncoder().encode(secret);
 }
 
-export async function verifyCredentials(email: string, password: string) {
-  const adminEmail = process.env.BUDGET_ADMIN_EMAIL;
-  const passwordHash = process.env.BUDGET_ADMIN_PASSWORD_HASH;
+function getAdminEmail() {
+  return process.env.BUDGET_ADMIN_EMAIL?.trim().toLowerCase() ?? "";
+}
 
-  if (!adminEmail || !passwordHash) {
+function getPasswordHash() {
+  const raw = process.env.BUDGET_ADMIN_PASSWORD_HASH?.trim();
+  if (!raw) return "";
+
+  // Next.js expands $ in .env locally; production should use raw hash.
+  // Accept hashes whether or not they were escaped during load.
+  if (raw.startsWith("$2")) return raw;
+
+  return raw.replace(/\\\$/g, "$");
+}
+
+export function isAuthConfigured() {
+  const email = getAdminEmail();
+  const hash = getPasswordHash();
+  const plain = process.env.BUDGET_ADMIN_PASSWORD?.trim();
+  return Boolean(email && (hash || plain));
+}
+
+export async function verifyCredentials(email: string, password: string) {
+  const adminEmail = getAdminEmail();
+  const passwordHash = getPasswordHash();
+  const plainPassword = process.env.BUDGET_ADMIN_PASSWORD?.trim();
+
+  if (!adminEmail || (!passwordHash && !plainPassword)) {
     return false;
   }
 
-  if (email.trim().toLowerCase() !== adminEmail.trim().toLowerCase()) {
+  if (email.trim().toLowerCase() !== adminEmail) {
     return false;
+  }
+
+  if (plainPassword) {
+    return password === plainPassword;
   }
 
   return bcrypt.compare(password, passwordHash);
