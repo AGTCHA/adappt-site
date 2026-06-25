@@ -19,3 +19,25 @@ model Lead {
   message   String?
   createdAt DateTime @default(now())
 }
+
+model Income {
+  id        Int      @id @default(autoincrement())
+  label     String
+  amount    Float
+  person    String   @default("joint")
+  frequency String   @default("monthly")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Expense {
+  id          Int      @id @default(autoincrement())
+  label       String
+  amount      Float
+  category    String
+  person      String   @default("joint")
+  date        DateTime @default(now())
+  isRecurring Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

@@ -5,6 +5,7 @@ export default function robots(): MetadataRoute.Robots {
 		rules: {
 			userAgent: "*",
 			allow: "/",
+			disallow: ["/budget", "/login", "/api/budget", "/api/auth"],
 		},
 		sitemap: "https://a-dappt.com/sitemap.xml",
 	};
