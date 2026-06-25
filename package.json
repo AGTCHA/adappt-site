@@ -4,12 +4,16 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "prisma migrate deploy && prisma generate && next build",
+    "build": "node scripts/migrate.mjs && prisma generate && next build",
+    "db:migrate": "node scripts/migrate.mjs",
+    "db:turso:info": "node scripts/turso-info.mjs",
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
+    "@libsql/client": "^0.17.4",
+    "@prisma/adapter-libsql": "^6.16.2",
     "@prisma/client": "^6.16.2",
     "@react-three/drei": "^10.7.6",
     "@react-three/fiber": "^9.3.0",
