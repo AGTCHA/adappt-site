@@ -7,11 +7,41 @@ import path from "node:path";
 const tursoUrl = process.env.TURSO_DATABASE_URL;
 const tursoToken = process.env.TURSO_AUTH_TOKEN;
 
+function resolveSqlitePath() {
+  const url = process.env.DATABASE_URL ?? "";
+  if (!url.startsWith("file:")) return null;
+  const rawPath = url.slice("file:".length);
+  if (path.isAbsolute(rawPath)) return rawPath;
+
+  // Prisma resolves relative SQLite paths against the schema directory
+  const candidates = [
+    path.join(process.cwd(), "prisma", rawPath),
+    path.join(process.cwd(), rawPath),
+  ];
+  return candidates.find((candidate) => fs.existsSync(candidate)) ?? candidates[0];
+}
+
+function runMigrateDeploy() {
+  return spawnSync("npx", ["prisma", "migrate", "deploy"], { stdio: "inherit" });
+}
+
 function runSqliteMigrations() {
   console.log("Applying SQLite migrations (local)…");
-  const result = spawnSync("npx", ["prisma", "migrate", "deploy"], {
-    stdio: "inherit",
-  });
+  let result = runMigrateDeploy();
+
+  if (result.status !== 0) {
+    // Likely a database from the previous (pre-Adapt) schema. Back it up and
+    // start fresh — this repo intentionally replaced the old application.
+    const dbPath = resolveSqlitePath();
+    if (dbPath && fs.existsSync(dbPath)) {
+      const backupPath = `${dbPath}.backup-${Date.now()}`;
+      console.warn(
+        `Migration failed — backing up incompatible database to ${backupPath} and retrying with a fresh one.`
+      );
+      fs.renameSync(dbPath, backupPath);
+      result = runMigrateDeploy();
+    }
+  }
 
   if (result.status !== 0) {
     process.exit(result.status ?? 1);

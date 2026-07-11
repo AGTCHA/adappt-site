@@ -1,21 +1,80 @@
-import { Suspense } from "react";
-import LoginForm from "@/components/budget/LoginForm";
+"use client";
 
-export const metadata = {
-  title: "Sign In | A-DappT Portal",
-  robots: { index: false, follow: false },
-};
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
+import { AuthCard } from "@/src/components/AuthCard";
+import { Button } from "@/src/components/ui/Button";
+import { Field, Input } from "@/src/components/ui/Field";
+import { useToast } from "@/src/components/ui/Toast";
+import { api } from "@/src/lib/client";
+
+function LoginForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const toast = useToast();
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState({ email: "", password: "" });
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await api("/api/auth/login", { method: "POST", json: form });
+      router.push(searchParams.get("from") ?? "/dashboard");
+      router.refresh();
+    } catch (error) {
+      toast("error", "Couldn't log in", (error as Error).message);
+      setLoading(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <Field label="Email">
+        <Input
+          required
+          type="email"
+          autoComplete="email"
+          placeholder="you@company.com"
+          value={form.email}
+          onChange={(e) => setForm({ ...form, email: e.target.value })}
+        />
+      </Field>
+      <Field label="Password">
+        <Input
+          required
+          type="password"
+          autoComplete="current-password"
+          placeholder="••••••••"
+          value={form.password}
+          onChange={(e) => setForm({ ...form, password: e.target.value })}
+        />
+      </Field>
+      <Button type="submit" size="lg" loading={loading} className="w-full">
+        Log in
+      </Button>
+    </form>
+  );
+}
 
 export default function LoginPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-[calc(100vh-72px)] flex items-center justify-center">
-          <div className="h-8 w-8 rounded-full border-2 border-accent/30 border-t-accent animate-spin" />
-        </div>
+    <AuthCard
+      title="Welcome back"
+      subtitle="Log in to your Adapt account."
+      footer={
+        <>
+          New to Adapt?{" "}
+          <Link href="/signup" className="font-medium text-accent hover:underline">
+            Create an account
+          </Link>
+        </>
       }
     >
-      <LoginForm />
-    </Suspense>
+      <Suspense>
+        <LoginForm />
+      </Suspense>
+    </AuthCard>
   );
 }

@@ -1,54 +1,21 @@
-import { NextRequest, NextResponse } from "next/server";
-import {
-  createSession,
-  destroySession,
-  isAuthConfigured,
-  verifyCredentials,
-} from "@/lib/auth";
+import { NextResponse } from "next/server";
+import { prisma } from "@/src/lib/prisma";
+import { createSession, verifyPassword } from "@/src/lib/auth";
 
-export async function POST(req: NextRequest) {
-  try {
-    if (!isAuthConfigured()) {
-      console.error("Login blocked: BUDGET_ADMIN_EMAIL and password env vars are not set");
-      return NextResponse.json(
-        { error: "Sign-in is unavailable. Please contact the administrator." },
-        { status: 503 },
-      );
-    }
+export async function POST(request: Request) {
+  const body = await request.json().catch(() => null);
+  const email = String(body?.email ?? "").trim().toLowerCase();
+  const password = String(body?.password ?? "");
 
-    const body = (await req.json()) as { email?: string; password?: string };
-    const email = String(body.email ?? "").trim();
-    const password = String(body.password ?? "");
-
-    if (!email || !password) {
-      return NextResponse.json(
-        { error: "Email and password are required." },
-        { status: 400 },
-      );
-    }
-
-    const valid = await verifyCredentials(email, password);
-    if (!valid) {
-      return NextResponse.json(
-        { error: "Invalid email or password." },
-        { status: 401 },
-      );
-    }
-
-    await createSession(email);
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Login failed", error);
-    return NextResponse.json({ error: "Login failed." }, { status: 500 });
+  if (!email || !password) {
+    return NextResponse.json({ error: "Please enter your email and password." }, { status: 400 });
   }
-}
 
-export async function DELETE() {
-  try {
-    await destroySession();
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Logout failed", error);
-    return NextResponse.json({ error: "Logout failed." }, { status: 500 });
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user || !(await verifyPassword(password, user.passwordHash))) {
+    return NextResponse.json({ error: "Incorrect email or password." }, { status: 401 });
   }
+
+  await createSession(user.id);
+  return NextResponse.json({ ok: true });
 }

@@ -1,36 +1,29 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Adapt — Recruiting & Fleet Management for Small Trucking Companies
 
-## Getting Started
+Live at [a-dappt.com](https://a-dappt.com). A self-serve platform where small fleet owners can:
 
-First, run the development server:
+- **Hire drivers** with a 3-step onboarding flow (application → documents → text link), plus spreadsheet import for existing teams
+- **Run job ads** with webhook lead capture from any ad platform (Facebook Lead Ads, Zapier, Make…)
+- **Manage the fleet** — trucks, driver assignments, AI-powered maintenance invoice extraction, and cents-per-mile analytics
+- **Track compliance** — CDL and med card expirations with AI document extraction (OpenAI)
+- **See every conversation** — texts, calls, and AI agent conversations in one timeline
+
+## Stack
+
+Next.js 15 (App Router) · Tailwind CSS v4 · Framer Motion · Prisma (SQLite / Turso) · OpenAI API
+
+## Local development
 
 ```bash
+npm install
+cp .env.example .env   # fill in AUTH_SECRET and OPENAI_API_KEY
+npm run db:migrate
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Deployment
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **EC2**: pushed to `main` deploys via GitHub Actions (`.github/workflows/deploy-ec2.yml`), or run `npm run deploy:ec2` manually. PM2 + nginx configs live in `deploy/`.
+- **Vercel**: works out of the box with Turso credentials (`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Required environment variables are documented in `.env.example`.

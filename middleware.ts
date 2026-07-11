@@ -2,7 +2,16 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
-const SESSION_COOKIE = "budget_session";
+const SESSION_COOKIE = "adapt_session";
+
+const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/drivers",
+  "/fleet",
+  "/job-ads",
+  "/messages",
+  "/support",
+];
 
 function getSecret() {
   const secret = process.env.AUTH_SECRET;
@@ -27,8 +36,9 @@ async function isAuthenticated(request: NextRequest) {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
 
-  if (pathname.startsWith("/budget")) {
+  if (isProtected) {
     const authed = await isAuthenticated(request);
     if (!authed) {
       const loginUrl = new URL("/login", request.url);
@@ -37,10 +47,10 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (pathname === "/login") {
+  if (pathname === "/login" || pathname === "/signup") {
     const authed = await isAuthenticated(request);
     if (authed) {
-      return NextResponse.redirect(new URL("/budget", request.url));
+      return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }
 
@@ -48,5 +58,14 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/budget/:path*", "/login"],
+  matcher: [
+    "/dashboard/:path*",
+    "/drivers/:path*",
+    "/fleet/:path*",
+    "/job-ads/:path*",
+    "/messages/:path*",
+    "/support/:path*",
+    "/login",
+    "/signup",
+  ],
 };

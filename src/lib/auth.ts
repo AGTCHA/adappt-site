@@ -1,9 +1,10 @@
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
+import { prisma } from "./prisma";
 
-export const SESSION_COOKIE = "budget_session";
-const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+export const SESSION_COOKIE = "adapt_session";
+const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 
 function getSecret() {
   const secret = process.env.AUTH_SECRET;
@@ -13,50 +14,16 @@ function getSecret() {
   return new TextEncoder().encode(secret);
 }
 
-function getAdminEmail() {
-  return process.env.BUDGET_ADMIN_EMAIL?.trim().toLowerCase() ?? "";
+export async function hashPassword(password: string) {
+  return bcrypt.hash(password, 12);
 }
 
-function getPasswordHash() {
-  const raw = process.env.BUDGET_ADMIN_PASSWORD_HASH?.trim();
-  if (!raw) return "";
-
-  // Next.js expands $ in .env locally; production should use raw hash.
-  // Accept hashes whether or not they were escaped during load.
-  if (raw.startsWith("$2")) return raw;
-
-  return raw.replace(/\\\$/g, "$");
+export async function verifyPassword(password: string, hash: string) {
+  return bcrypt.compare(password, hash);
 }
 
-export function isAuthConfigured() {
-  const email = getAdminEmail();
-  const hash = getPasswordHash();
-  const plain = process.env.BUDGET_ADMIN_PASSWORD?.trim();
-  return Boolean(email && (hash || plain));
-}
-
-export async function verifyCredentials(email: string, password: string) {
-  const adminEmail = getAdminEmail();
-  const passwordHash = getPasswordHash();
-  const plainPassword = process.env.BUDGET_ADMIN_PASSWORD?.trim();
-
-  if (!adminEmail || (!passwordHash && !plainPassword)) {
-    return false;
-  }
-
-  if (email.trim().toLowerCase() !== adminEmail) {
-    return false;
-  }
-
-  if (plainPassword) {
-    return password === plainPassword;
-  }
-
-  return bcrypt.compare(password, passwordHash);
-}
-
-export async function createSession(email: string) {
-  const token = await new SignJWT({ email: email.toLowerCase() })
+export async function createSession(userId: string) {
+  const token = await new SignJWT({ sub: userId })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_MAX_AGE}s`)
@@ -77,25 +44,40 @@ export async function destroySession() {
   cookieStore.delete(SESSION_COOKIE);
 }
 
-export async function getSession() {
+export async function getSessionUserId(): Promise<string | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (!token) return null;
 
   try {
     const { payload } = await jwtVerify(token, getSecret());
-    const email = payload.email;
-    if (typeof email !== "string") return null;
-    return { email };
+    return typeof payload.sub === "string" ? payload.sub : null;
   } catch {
     return null;
   }
 }
 
-export async function requireSession() {
-  const session = await getSession();
-  if (!session) {
-    throw new Error("Unauthorized");
+export async function getSessionUser() {
+  const userId = await getSessionUserId();
+  if (!userId) return null;
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, name: true, companyName: true },
+  });
+}
+
+/** For API routes: returns the user id or throws a 401-worthy error. */
+export async function requireUserId(): Promise<string> {
+  const userId = await getSessionUserId();
+  if (!userId) {
+    throw new AuthError();
   }
-  return session;
+  return userId;
+}
+
+export class AuthError extends Error {
+  constructor() {
+    super("Unauthorized");
+    this.name = "AuthError";
+  }
 }

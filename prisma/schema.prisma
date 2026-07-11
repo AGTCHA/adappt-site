@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
   output   = "../app/generated/prisma"
@@ -11,42 +8,180 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Lead {
-  id        Int      @id @default(autoincrement())
-  name      String
-  email     String
-  company   String?
-  message   String?
-  createdAt DateTime @default(now())
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  companyName  String
+  createdAt    DateTime @default(now())
+
+  drivers     Driver[]
+  trucks      Truck[]
+  jobAds      JobAd[]
+  leads       Lead[]
+  messages    Message[]
+  maintenance MaintenanceRecord[]
+  tickets     SupportTicket[]
 }
 
-model Income {
-  id        Int      @id @default(autoincrement())
-  label     String
-  amount    Float
-  person    String   @default("joint")
-  frequency String   @default("monthly")
+model Driver {
+  id        String  @id @default(cuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName String
+  lastName  String
+  phone     String  @default("")
+  email     String  @default("")
+
+  // applicant | onboarding | active | inactive
+  status String @default("applicant")
+
+  // Recruiting info
+  experienceYears Int?
+  endorsements    String @default("")
+  preferredRoute  String @default("")
+  source          String @default("manual")
+  notes           String @default("")
+
+  // Safety & compliance
+  cdlNumber     String    @default("")
+  cdlState      String    @default("")
+  cdlExpiry     DateTime?
+  medCardExpiry DateTime?
+
+  onboardingStep Int     @default(0)
+  applyToken     String? @unique
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  documents Document[]
+  truck     Truck?
+  messages  Message[]
 }
 
-model Expense {
-  id          Int      @id @default(autoincrement())
-  label       String
-  amount      Float
-  category    String
-  person      String   @default("joint")
+model Document {
+  id       String @id @default(cuid())
+  driverId String
+  driver   Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  // cdl | medcard | other
+  type      String
+  fileName  String
+  mimeType  String
+  data      String // base64
+  extracted String @default("") // JSON from AI extraction
+  createdAt DateTime @default(now())
+}
+
+model Truck {
+  id         String @id @default(cuid())
+  userId     String
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  unitNumber String
+  year       Int
+  make       String
+  model      String
+  vin        String @default("")
+  mileage    Int    @default(0)
+
+  // active | in_shop | inactive
+  status String @default("active")
+
+  driverId String? @unique
+  driver   Driver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  maintenance MaintenanceRecord[]
+}
+
+model MaintenanceRecord {
+  id      String @id @default(cuid())
+  truckId String
+  truck   Truck  @relation(fields: [truckId], references: [id], onDelete: Cascade)
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   date        DateTime @default(now())
-  isRecurring Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  vendor      String   @default("")
+  description String   @default("")
+  amount      Float
+  // preventative | accident
+  category  String @default("preventative")
+  odometer  Int?
+  invoiceFileName String @default("")
+  extracted       String @default("") // raw JSON from AI invoice extraction
+
+  createdAt DateTime @default(now())
 }
 
-model SavingsGoal {
-  id        Int      @id @default(autoincrement())
-  name      String
-  target    Float
-  saved     Float    @default(0)
+model JobAd {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title        String
+  description  String @default("")
+  payRange     String @default("")
+  location     String @default("")
+  // active | paused | closed
+  status       String @default("active")
+  webhookToken String @unique
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  leads Lead[]
+}
+
+model Lead {
+  id      String @id @default(cuid())
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobAdId String
+  jobAd   JobAd  @relation(fields: [jobAdId], references: [id], onDelete: Cascade)
+
+  name    String @default("")
+  phone   String @default("")
+  email   String @default("")
+  source  String @default("webhook")
+  payload String @default("")
+  // new | contacted | converted | dismissed
+  status String @default("new")
+
+  createdAt DateTime @default(now())
+}
+
+model Message {
+  id       String  @id @default(cuid())
+  userId   String
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  driverId String?
+  driver   Driver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
+
+  // inbound | outbound
+  direction String
+  // sms | call | ai_call | email | system
+  channel     String
+  contactName String @default("")
+  body        String
+
+  createdAt DateTime @default(now())
+}
+
+model SupportTicket {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // feedback | bug | support
+  type    String
+  subject String
+  body    String
+  status  String @default("open")
+
+  createdAt DateTime @default(now())
 }
