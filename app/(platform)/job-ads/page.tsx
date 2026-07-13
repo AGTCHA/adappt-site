@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Megaphone,
   Plus,
@@ -13,11 +13,14 @@ import {
   X,
   Phone,
   Mail,
+  PhoneCall,
+  CheckCircle2,
 } from "lucide-react";
 import { PageHeader } from "@/src/components/PageHeader";
-import { Badge, leadStatusTone } from "@/src/components/ui/Badge";
+import { Badge } from "@/src/components/ui/Badge";
 import { Button } from "@/src/components/ui/Button";
 import { Card } from "@/src/components/ui/Card";
+import { StatCard } from "@/src/components/ui/StatCard";
 import { EmptyState, Skeleton } from "@/src/components/ui/EmptyState";
 import { Field, Input, Textarea } from "@/src/components/ui/Field";
 import { Modal } from "@/src/components/ui/Modal";
@@ -52,6 +55,30 @@ const adStatusTone: Record<string, "success" | "warning" | "neutral"> = {
   paused: "warning",
   closed: "neutral",
 };
+
+const pipelineColumns = [
+  {
+    key: "new",
+    label: "New",
+    icon: Inbox,
+    hint: "Fresh from your ads — reach out fast.",
+    tone: "text-accent",
+  },
+  {
+    key: "contacted",
+    label: "Contacted",
+    icon: PhoneCall,
+    hint: "You've reached out — waiting to hear back.",
+    tone: "text-warning",
+  },
+  {
+    key: "converted",
+    label: "Added to Drivers",
+    icon: CheckCircle2,
+    hint: "In your pipeline as applicants.",
+    tone: "text-success",
+  },
+] as const;
 
 function JobAdsContent() {
   const router = useRouter();
@@ -111,11 +138,14 @@ function JobAdsContent() {
     toast("info", "Webhook URL copied", "Paste it into Facebook Lead Ads, Zapier, or your ad platform.");
   }
 
-  async function leadAction(lead: LeadRow, action: "convert" | "dismiss") {
+  async function leadAction(lead: LeadRow, action: "convert" | "dismiss" | "contacted") {
     try {
       if (action === "convert") {
         await api(`/api/leads/${lead.id}`, { method: "PATCH", json: { action: "convert" } });
         toast("success", "Lead added to Drivers", `${lead.name || "The applicant"} is now in your pipeline.`);
+      } else if (action === "contacted") {
+        await api(`/api/leads/${lead.id}`, { method: "PATCH", json: { status: "contacted" } });
+        toast("success", "Marked as contacted");
       } else {
         await api(`/api/leads/${lead.id}`, { method: "PATCH", json: { status: "dismissed" } });
         toast("success", "Lead dismissed");
@@ -126,7 +156,25 @@ function JobAdsContent() {
     }
   }
 
-  const activeLeads = (leads ?? []).filter((lead) => lead.status !== "dismissed");
+  const stats = useMemo(() => {
+    if (!ads || !leads) return null;
+    const weekAgo = Date.now() - 7 * 86_400_000;
+    const active = leads.filter((l) => l.status !== "dismissed");
+    return {
+      activeAds: ads.filter((a) => a.status === "active").length,
+      totalLeads: active.length,
+      newThisWeek: leads.filter((l) => new Date(l.createdAt).getTime() >= weekAgo).length,
+      converted: leads.filter((l) => l.status === "converted").length,
+    };
+  }, [ads, leads]);
+
+  const leadsByStatus = useMemo(() => {
+    const map: Record<string, LeadRow[]> = { new: [], contacted: [], converted: [] };
+    for (const lead of leads ?? []) {
+      if (map[lead.status]) map[lead.status].push(lead);
+    }
+    return map;
+  }, [leads]);
 
   return (
     <div>
@@ -139,6 +187,49 @@ function JobAdsContent() {
           </Button>
         }
       />
+
+      {/* KPI row */}
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {!stats ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-[74px] rounded-2xl" />
+          ))
+        ) : (
+          <>
+            <StatCard
+              label="Active ads"
+              value={stats.activeAds}
+              sub={`of ${ads!.length} total`}
+              icon={<Megaphone size={17} />}
+              tone="accent"
+            />
+            <StatCard
+              label="Open leads"
+              value={stats.totalLeads}
+              sub="in your pipeline"
+              icon={<Inbox size={17} />}
+              tone={leadsByStatus.new.length > 0 ? "warning" : "default"}
+              delay={0.05}
+            />
+            <StatCard
+              label="New this week"
+              value={stats.newThisWeek}
+              sub="last 7 days"
+              icon={<UserPlus size={17} />}
+              tone="default"
+              delay={0.1}
+            />
+            <StatCard
+              label="Converted"
+              value={stats.converted}
+              sub="became applicants"
+              icon={<CheckCircle2 size={17} />}
+              tone="success"
+              delay={0.15}
+            />
+          </>
+        )}
+      </div>
 
       {/* Ads */}
       {ads === null ? (
@@ -207,16 +298,16 @@ function JobAdsContent() {
         </div>
       )}
 
-      {/* Leads */}
+      {/* Lead pipeline board */}
       <div className="mt-10">
-        <h2 className="mb-4 text-lg font-semibold tracking-tight">Incoming leads</h2>
+        <h2 className="mb-4 text-lg font-semibold tracking-tight">Lead pipeline</h2>
         {leads === null ? (
-          <div className="space-y-2">
+          <div className="grid gap-4 lg:grid-cols-3">
             {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-16 rounded-2xl" />
+              <Skeleton key={i} className="h-48 rounded-2xl" />
             ))}
           </div>
-        ) : activeLeads.length === 0 ? (
+        ) : leads.filter((l) => l.status !== "dismissed").length === 0 ? (
           <Card className="p-6">
             <p className="text-sm leading-relaxed text-ink-secondary">
               No leads yet. Copy an ad&apos;s webhook URL into your ad platform
@@ -225,55 +316,97 @@ function JobAdsContent() {
             </p>
           </Card>
         ) : (
-          <div className="space-y-2">
-            {activeLeads.map((lead, i) => (
-              <motion.div
-                key={lead.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ type: "spring", stiffness: 300, damping: 28, delay: Math.min(i * 0.03, 0.3) }}
-                className="glass flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl px-5 py-4"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">{lead.name || "Unnamed applicant"}</p>
-                  <p className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-ink-tertiary">
-                    {lead.phone && (
-                      <span className="inline-flex items-center gap-1">
-                        <Phone size={11} /> {lead.phone}
-                      </span>
-                    )}
-                    {lead.email && (
-                      <span className="inline-flex items-center gap-1">
-                        <Mail size={11} /> {lead.email}
-                      </span>
-                    )}
-                    <span>{lead.jobAd.title}</span>
-                  </p>
-                </div>
-                <Badge tone={leadStatusTone[lead.status] ?? "neutral"}>
-                  {lead.status.charAt(0).toUpperCase() + lead.status.slice(1)}
-                </Badge>
-                <span className="text-xs text-ink-tertiary">{formatRelative(lead.createdAt)}</span>
-                {lead.status !== "converted" && (
-                  <div className="flex gap-1.5">
-                    <Button
-                      size="sm"
-                      icon={<UserPlus size={13} />}
-                      onClick={() => leadAction(lead, "convert")}
-                    >
-                      Add to Drivers
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      icon={<X size={13} />}
-                      onClick={() => leadAction(lead, "dismiss")}
-                      className="text-ink-tertiary"
-                    />
+          <div className="grid items-start gap-4 lg:grid-cols-3">
+            {pipelineColumns.map((column, ci) => {
+              const Icon = column.icon;
+              const columnLeads = leadsByStatus[column.key];
+              return (
+                <motion.div
+                  key={column.key}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ type: "spring", stiffness: 260, damping: 26, delay: ci * 0.06 }}
+                  className="rounded-2xl border border-border bg-surface/50 p-3 backdrop-blur"
+                >
+                  <div className="mb-3 flex items-center gap-2 px-1.5">
+                    <Icon size={14} className={column.tone} />
+                    <h3 className="text-sm font-semibold">{column.label}</h3>
+                    <span className="ml-auto rounded-full bg-border/60 px-2 py-0.5 text-[11px] font-semibold text-ink-secondary">
+                      {columnLeads.length}
+                    </span>
                   </div>
-                )}
-              </motion.div>
-            ))}
+                  {columnLeads.length === 0 ? (
+                    <p className="px-1.5 pb-2 text-xs leading-relaxed text-ink-tertiary">
+                      {column.hint}
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {columnLeads.map((lead) => (
+                        <div
+                          key={lead.id}
+                          className="rounded-xl bg-surface-solid p-3.5 shadow-sm ring-1 ring-border"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="min-w-0 truncate text-sm font-medium">
+                              {lead.name || "Unnamed applicant"}
+                            </p>
+                            <span className="shrink-0 text-[11px] text-ink-tertiary">
+                              {formatRelative(lead.createdAt)}
+                            </span>
+                          </div>
+                          <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-ink-tertiary">
+                            {lead.phone && (
+                              <a
+                                href={`tel:${lead.phone}`}
+                                className="inline-flex items-center gap-1 hover:text-accent"
+                              >
+                                <Phone size={10} /> {lead.phone}
+                              </a>
+                            )}
+                            {lead.email && (
+                              <span className="inline-flex items-center gap-1">
+                                <Mail size={10} /> {lead.email}
+                              </span>
+                            )}
+                          </p>
+                          <p className="mt-1 truncate text-[11px] text-ink-tertiary">
+                            via {lead.jobAd.title}
+                          </p>
+                          {lead.status !== "converted" && (
+                            <div className="mt-2.5 flex gap-1.5">
+                              {lead.status === "new" && (
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  icon={<PhoneCall size={12} />}
+                                  onClick={() => leadAction(lead, "contacted")}
+                                >
+                                  Contacted
+                                </Button>
+                              )}
+                              <Button
+                                size="sm"
+                                icon={<UserPlus size={12} />}
+                                onClick={() => leadAction(lead, "convert")}
+                              >
+                                Add to Drivers
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                icon={<X size={12} />}
+                                onClick={() => leadAction(lead, "dismiss")}
+                                className="ml-auto text-ink-tertiary"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </motion.div>
+              );
+            })}
           </div>
         )}
       </div>
