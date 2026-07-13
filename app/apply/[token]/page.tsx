@@ -244,16 +244,16 @@ export default function ApplyPage() {
                   </div>
                   <FileDrop
                     label="Photo of your CDL"
-                    sublabel="Tap to use your camera or choose a photo"
-                    accept="image/*"
+                    sublabel="Tap to use your camera or choose a file"
+                    accept="image/*,.pdf,application/pdf"
                     busy={uploading === "cdl"}
                     done={uploads.cdl}
                     onFile={(file) => uploadDocument("cdl", file)}
                   />
                   <FileDrop
                     label="Photo of your Med Card"
-                    sublabel="Tap to use your camera or choose a photo"
-                    accept="image/*"
+                    sublabel="Tap to use your camera or choose a file"
+                    accept="image/*,.pdf,application/pdf"
                     busy={uploading === "medcard"}
                     done={uploads.medcard}
                     onFile={(file) => uploadDocument("medcard", file)}

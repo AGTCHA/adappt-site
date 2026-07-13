@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireUserId } from "@/src/lib/auth";
 import { handleApiError } from "@/src/lib/api";
 import {
-  extractMaintenanceInvoice,
+  extractDriverApplication,
   isAiConfigured,
   isExtractableMimeType,
 } from "@/src/lib/openai";
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "AI extraction isn't set up yet. Add an OpenAI API key to enable it, or enter the invoice details manually.",
+            "AI extraction isn't set up yet. Add an OpenAI API key to enable it, or type the application in manually.",
         },
         { status: 503 }
       );
@@ -26,14 +26,14 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const dataUrl = String(body.dataUrl ?? "");
     const mimeType = String(body.mimeType ?? "");
-    const fileName = String(body.fileName ?? "invoice");
+    const fileName = String(body.fileName ?? "application");
 
     if (!dataUrl.startsWith("data:")) {
       return NextResponse.json({ error: "Invalid file upload." }, { status: 400 });
     }
     if (!isExtractableMimeType(mimeType)) {
       return NextResponse.json(
-        { error: "Please upload a photo or PDF of the invoice." },
+        { error: "Please upload a PDF or photo of the driver's application." },
         { status: 400 }
       );
     }
@@ -44,10 +44,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const extracted = await extractMaintenanceInvoice({ dataUrl, mimeType, fileName });
-    if (!extracted) {
+    const extracted = await extractDriverApplication({ dataUrl, mimeType, fileName });
+    if (!extracted || (!extracted.firstName && !extracted.lastName)) {
       return NextResponse.json(
-        { error: "Couldn't read this invoice. Try a clearer photo or PDF, or enter the details manually." },
+        {
+          error:
+            "Couldn't find a driver name in this file. Check it's a driver application, or type the details in manually.",
+        },
         { status: 422 }
       );
     }

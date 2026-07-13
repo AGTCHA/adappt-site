@@ -35,6 +35,12 @@ export async function POST(request: Request) {
       );
     }
 
+    const parseDate = (value: unknown) => {
+      if (typeof value !== "string" || !value) return null;
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date;
+    };
+
     const driver = await prisma.driver.create({
       data: {
         userId,
@@ -51,6 +57,10 @@ export async function POST(request: Request) {
         preferredRoute: String(body.preferredRoute ?? "").trim(),
         source: String(body.source ?? "manual"),
         notes: String(body.notes ?? "").trim(),
+        cdlNumber: String(body.cdlNumber ?? "").trim(),
+        cdlState: String(body.cdlState ?? "").trim(),
+        cdlExpiry: parseDate(body.cdlExpiry),
+        medCardExpiry: parseDate(body.medCardExpiry),
         onboardingStep: 1,
         applyToken: randomBytes(16).toString("hex"),
       },

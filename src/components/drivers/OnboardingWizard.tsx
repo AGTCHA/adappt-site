@@ -18,6 +18,45 @@ interface DriverLite {
   phone: string;
 }
 
+interface ExtractedEmployer {
+  name?: string;
+  city?: string;
+  state?: string;
+  position?: string;
+  from?: string;
+  to?: string;
+}
+
+interface ExtractedApplication {
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  email?: string;
+  city?: string;
+  state?: string;
+  cdlNumber?: string;
+  cdlState?: string;
+  cdlExpiration?: string;
+  medicalCardExpiration?: string;
+  yearsExperience?: string;
+  endorsements?: string;
+  preferredRoute?: string;
+  employers?: ExtractedEmployer[];
+  fieldConfidence?: Record<string, number>;
+}
+
+function employersToNotes(employers: ExtractedEmployer[] | undefined): string {
+  if (!employers || employers.length === 0) return "";
+  const lines = employers
+    .filter((e) => e.name)
+    .map((e) => {
+      const where = [e.city, e.state].filter(Boolean).join(", ");
+      const when = [e.from, e.to].filter(Boolean).join(" → ");
+      return `• ${e.name}${where ? ` (${where})` : ""}${e.position ? ` — ${e.position}` : ""}${when ? `, ${when}` : ""}`;
+    });
+  return lines.length > 0 ? `Previous employers (from application):\n${lines.join("\n")}` : "";
+}
+
 export function OnboardingWizard({
   open,
   onClose,
@@ -41,6 +80,12 @@ export function OnboardingWizard({
     endorsements: "",
     preferredRoute: "",
   });
+
+  // "Scan application" mode
+  const [entryMode, setEntryMode] = useState<"manual" | "scan">("manual");
+  const [scanning, setScanning] = useState(false);
+  const [applicationFile, setApplicationFile] = useState<DroppedFile | null>(null);
+  const [extractedApp, setExtractedApp] = useState<ExtractedApplication | null>(null);
 
   const [uploads, setUploads] = useState<{ cdl: boolean; medcard: boolean }>({
     cdl: false,
@@ -70,6 +115,10 @@ export function OnboardingWizard({
     setLink(null);
     setSmsHref(null);
     setCopied(false);
+    setEntryMode("manual");
+    setScanning(false);
+    setApplicationFile(null);
+    setExtractedApp(null);
   }
 
   function handleClose() {
@@ -78,15 +127,70 @@ export function OnboardingWizard({
     setTimeout(reset, 300);
   }
 
+  async function scanApplication(file: DroppedFile) {
+    setScanning(true);
+    try {
+      const { extracted } = await api<{ extracted: ExtractedApplication }>(
+        "/api/drivers/extract-application",
+        { method: "POST", json: file }
+      );
+      setApplicationFile(file);
+      setExtractedApp(extracted);
+      setForm({
+        firstName: extracted.firstName ?? "",
+        lastName: extracted.lastName ?? "",
+        phone: extracted.phone ?? "",
+        email: extracted.email ?? "",
+        experienceYears: extracted.yearsExperience ?? "",
+        endorsements: extracted.endorsements ?? "",
+        preferredRoute: ["local", "regional", "otr"].includes(extracted.preferredRoute ?? "")
+          ? (extracted.preferredRoute as string)
+          : "",
+      });
+      setEntryMode("manual");
+      toast("success", "Application read", "Check the details below, then continue.");
+    } catch (error) {
+      toast("error", "Couldn't read application", (error as Error).message);
+    } finally {
+      setScanning(false);
+    }
+  }
+
   async function submitApplication(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
       const { driver: created } = await api<{ driver: DriverLite }>("/api/drivers", {
         method: "POST",
-        json: { ...form, source: "manual" },
+        json: {
+          ...form,
+          source: extractedApp ? "application" : "manual",
+          cdlNumber: extractedApp?.cdlNumber ?? "",
+          cdlState: extractedApp?.cdlState ?? "",
+          cdlExpiry: extractedApp?.cdlExpiration || null,
+          medCardExpiry: extractedApp?.medicalCardExpiration || null,
+          notes: employersToNotes(extractedApp?.employers),
+        },
       });
       setDriver(created);
+
+      // Attach the original application file to the new driver's documents
+      if (applicationFile) {
+        try {
+          await api(`/api/drivers/${created.id}/documents`, {
+            method: "POST",
+            json: {
+              type: "application",
+              ...applicationFile,
+              extracted: extractedApp,
+            },
+          });
+        } catch {
+          // Non-fatal: the driver exists; the file just didn't attach.
+          toast("warning", "Application file didn't attach", "The driver was created — you can re-upload the file from their profile.");
+        }
+      }
+
       setStep(1);
     } catch (error) {
       toast("error", "Couldn't save application", (error as Error).message);
@@ -186,6 +290,58 @@ export function OnboardingWizard({
             onSubmit={submitApplication}
             className="space-y-4"
           >
+            {/* Entry mode toggle */}
+            <div className="flex gap-1 rounded-xl border border-border bg-surface-solid p-1">
+              <button
+                type="button"
+                onClick={() => setEntryMode("manual")}
+                className={`focus-ring flex-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                  entryMode === "manual"
+                    ? "bg-accent-soft text-accent"
+                    : "text-ink-secondary hover:text-ink"
+                }`}
+              >
+                Type it in
+              </button>
+              <button
+                type="button"
+                onClick={() => setEntryMode("scan")}
+                className={`focus-ring flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                  entryMode === "scan"
+                    ? "bg-accent-soft text-accent"
+                    : "text-ink-secondary hover:text-ink"
+                }`}
+              >
+                <Sparkles size={12} />
+                Scan application
+              </button>
+            </div>
+
+            {entryMode === "scan" && !extractedApp && (
+              <FileDrop
+                label="Drop the driver's application"
+                sublabel="PDF or photo — AI fills in the whole form"
+                accept="image/*,.pdf,application/pdf"
+                busy={scanning}
+                onFile={scanApplication}
+              />
+            )}
+
+            {extractedApp && (
+              <div className="flex items-start gap-2 rounded-xl bg-accent-soft px-4 py-3 text-sm text-accent">
+                <Sparkles size={15} className="mt-0.5 shrink-0" />
+                <span>
+                  Read from “{applicationFile?.fileName}” — review before continuing.
+                  {extractedApp.cdlNumber &&
+                    ` CDL ${extractedApp.cdlNumber}${extractedApp.cdlState ? ` (${extractedApp.cdlState})` : ""} and compliance dates will be saved too.`}
+                  {(extractedApp.employers?.length ?? 0) > 0 &&
+                    ` ${extractedApp.employers?.length} previous employer${(extractedApp.employers?.length ?? 0) === 1 ? "" : "s"} go to the driver's notes.`}
+                </span>
+              </div>
+            )}
+
+            {(entryMode === "manual" || extractedApp) && (
+            <>
             <div className="grid grid-cols-2 gap-3">
               <Field label="First name">
                 <Input
@@ -257,6 +413,8 @@ export function OnboardingWizard({
                 Continue
               </Button>
             </div>
+            </>
+            )}
           </motion.form>
         )}
 

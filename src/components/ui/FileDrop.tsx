@@ -30,6 +30,7 @@ export function FileDrop({
   accept = "image/*,.pdf",
   busy,
   done,
+  multiple,
   onFile,
 }: {
   label: string;
@@ -37,6 +38,7 @@ export function FileDrop({
   accept?: string;
   busy?: boolean;
   done?: boolean;
+  multiple?: boolean;
   onFile: (file: DroppedFile) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -44,12 +46,13 @@ export function FileDrop({
 
   const handleFiles = useCallback(
     async (files: FileList | null) => {
-      const file = files?.[0];
-      if (!file) return;
-      const dropped = await readFileAsDataUrl(file);
-      onFile(dropped);
+      if (!files || files.length === 0) return;
+      const list = multiple ? Array.from(files) : [files[0]];
+      for (const file of list) {
+        onFile(await readFileAsDataUrl(file));
+      }
     },
-    [onFile]
+    [onFile, multiple]
   );
 
   return (
@@ -81,6 +84,7 @@ export function FileDrop({
         ref={inputRef}
         type="file"
         accept={accept}
+        multiple={multiple}
         className="hidden"
         onChange={(e) => {
           handleFiles(e.target.files);

@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
-import { extractDriverDocument, isAiConfigured } from "@/src/lib/openai";
+import {
+  extractDriverDocument,
+  isAiConfigured,
+  isExtractableMimeType,
+} from "@/src/lib/openai";
+
+export const maxDuration = 120;
 
 type Params = { params: Promise<{ token: string }> };
 
@@ -73,8 +79,11 @@ export async function POST(request: Request, { params }: Params) {
     }
 
     let extracted: Record<string, unknown> | null = null;
-    if (isAiConfigured() && mimeType.startsWith("image/")) {
-      extracted = await extractDriverDocument(dataUrl, type);
+    if (isAiConfigured() && isExtractableMimeType(mimeType)) {
+      extracted = await extractDriverDocument(
+        { dataUrl, mimeType, fileName: String(body.fileName ?? "document") },
+        type
+      );
     }
 
     await prisma.document.create({

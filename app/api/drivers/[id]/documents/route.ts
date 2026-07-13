@@ -2,11 +2,17 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
 import { requireUserId } from "@/src/lib/auth";
 import { handleApiError } from "@/src/lib/api";
-import { extractDriverDocument, isAiConfigured } from "@/src/lib/openai";
+import {
+  extractDriverDocument,
+  isAiConfigured,
+  isExtractableMimeType,
+} from "@/src/lib/openai";
+
+export const maxDuration = 120;
 
 type Params = { params: Promise<{ id: string }> };
 
-const MAX_SIZE_BYTES = 8 * 1024 * 1024; // ~8MB as base64
+const MAX_DATAURL_LENGTH = 20_000_000; // ~14MB file as base64
 
 export async function POST(request: Request, { params }: Params) {
   try {
@@ -19,7 +25,9 @@ export async function POST(request: Request, { params }: Params) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const type = ["cdl", "medcard", "other"].includes(body.type) ? body.type : "other";
+    const type = ["cdl", "medcard", "application", "other"].includes(body.type)
+      ? body.type
+      : "other";
     const fileName = String(body.fileName ?? "document");
     const mimeType = String(body.mimeType ?? "application/octet-stream");
     const dataUrl = String(body.dataUrl ?? "");
@@ -27,17 +35,24 @@ export async function POST(request: Request, { params }: Params) {
     if (!dataUrl.startsWith("data:")) {
       return NextResponse.json({ error: "Invalid file upload." }, { status: 400 });
     }
-    if (dataUrl.length > MAX_SIZE_BYTES * 1.4) {
+    if (dataUrl.length > MAX_DATAURL_LENGTH) {
       return NextResponse.json(
-        { error: "File is too large. Please upload a file under 8MB." },
+        { error: "File is too large. Please upload a file under 14MB." },
         { status: 400 }
       );
     }
 
-    // AI extraction (image types only)
+    // AI extraction (applications are extracted client-side before upload)
     let extracted: Record<string, unknown> | null = null;
-    if (isAiConfigured() && mimeType.startsWith("image/")) {
-      extracted = await extractDriverDocument(dataUrl, type);
+    if (
+      isAiConfigured() &&
+      isExtractableMimeType(mimeType) &&
+      (type === "cdl" || type === "medcard")
+    ) {
+      extracted = await extractDriverDocument({ dataUrl, mimeType, fileName }, type);
+    }
+    if (type === "application" && body.extracted && typeof body.extracted === "object") {
+      extracted = body.extracted as Record<string, unknown>;
     }
 
     const document = await prisma.document.create({
@@ -77,7 +92,7 @@ export async function POST(request: Request, { params }: Params) {
     }
 
     // Advance onboarding to step 2 once documents exist
-    if (driver.onboardingStep < 2) {
+    if (driver.onboardingStep < 2 && type !== "application") {
       updates.onboardingStep = 2;
     }
 

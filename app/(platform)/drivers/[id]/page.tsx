@@ -503,8 +503,24 @@ export default function DriverProfilePage() {
                     >
                       <FileText size={15} className="shrink-0 text-ink-tertiary" />
                       <span className="min-w-0 flex-1 truncate text-sm">{doc.fileName}</span>
-                      <Badge tone={doc.type === "cdl" ? "accent" : doc.type === "medcard" ? "success" : "neutral"}>
-                        {doc.type === "cdl" ? "CDL" : doc.type === "medcard" ? "Med card" : "Other"}
+                      <Badge
+                        tone={
+                          doc.type === "cdl"
+                            ? "accent"
+                            : doc.type === "medcard"
+                              ? "success"
+                              : doc.type === "application"
+                                ? "warning"
+                                : "neutral"
+                        }
+                      >
+                        {doc.type === "cdl"
+                          ? "CDL"
+                          : doc.type === "medcard"
+                            ? "Med card"
+                            : doc.type === "application"
+                              ? "Application"
+                              : "Other"}
                       </Badge>
                       <span className="shrink-0 text-xs text-ink-tertiary">
                         {formatDate(doc.createdAt)}
