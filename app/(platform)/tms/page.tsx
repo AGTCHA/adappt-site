@@ -49,27 +49,85 @@ const pipelineTone: Record<string, "neutral" | "accent" | "warning" | "success" 
 const quickLinks = [
   { label: "Planning", href: "/tms/planning", icon: <Layers size={17} /> },
   { label: "Dispatch", href: "/tms/dispatch", icon: <Truck size={17} /> },
-  { label: "Fleet", href: "/fleet", icon: <Truck size={17} /> },
+  { label: "Fleet", href: "/tms/fleet", icon: <Truck size={17} /> },
   { label: "Load Board", href: "/tms/load-board", icon: <Search size={17} /> },
   { label: "Invoices", href: "/tms/invoices", icon: <FileText size={17} /> },
 ];
+
+const EMPTY: DashboardData = {
+  stats: {
+    activeLoads: 0,
+    deliveredThisWeek: 0,
+    revenueThisWeek: 0,
+    outstandingAR: 0,
+  },
+  tasks: [],
+  pipeline: [],
+};
+
+function normalizeDashboard(raw: unknown): DashboardData {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const statsRaw = (r.stats ?? {}) as Record<string, unknown>;
+  const counts = (r.countsByStatus ?? {}) as Record<string, number>;
+
+  const activeFromCounts =
+    (counts.pending ?? 0) +
+    (counts.assigned ?? 0) +
+    (counts.in_transit ?? 0) +
+    (counts.draft ?? 0) +
+    (counts.dispatched ?? 0);
+
+  const pipelineFromCounts = Object.entries(counts).map(([status, count]) => ({
+    status,
+    count: Number(count) || 0,
+  }));
+
+  const tasksRaw = Array.isArray(r.tasks) ? r.tasks : [];
+  const tasks = tasksRaw.map((t, i) => {
+    const row = t as Record<string, unknown>;
+    return {
+      id: String(row.id ?? row.type ?? i),
+      title: String(row.title ?? row.label ?? "Task"),
+      link: String(row.link ?? row.href ?? "/tms/loads"),
+      priority: String(row.priority ?? "medium"),
+    };
+  });
+
+  const pipeline = Array.isArray(r.pipeline)
+    ? (r.pipeline as DashboardData["pipeline"])
+    : pipelineFromCounts;
+
+  return {
+    stats: {
+      activeLoads: Number(statsRaw.activeLoads ?? activeFromCounts) || 0,
+      deliveredThisWeek:
+        Number(statsRaw.deliveredThisWeek ?? counts.delivered ?? 0) || 0,
+      revenueThisWeek:
+        Number(statsRaw.revenueThisWeek ?? r.revenueThisWeek ?? 0) || 0,
+      outstandingAR:
+        Number(statsRaw.outstandingAR ?? r.outstandingAR ?? 0) || 0,
+    },
+    tasks,
+    pipeline,
+  };
+}
 
 export default function TmsDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    api<DashboardData>("/api/tms/dashboard")
-      .then(setData)
+    api<unknown>("/api/tms/dashboard")
+      .then((raw) => setData(normalizeDashboard(raw)))
       .catch(() => {
         setError(true);
-        setData({
-          stats: { activeLoads: 0, deliveredThisWeek: 0, revenueThisWeek: 0, outstandingAR: 0 },
-          tasks: [],
-          pipeline: [],
-        });
+        setData(EMPTY);
       });
   }, []);
+
+  const stats = data?.stats ?? EMPTY.stats;
+  const pipeline = data?.pipeline ?? EMPTY.pipeline;
+  const tasks = data?.tasks ?? EMPTY.tasks;
 
   return (
     <div>
@@ -94,14 +152,14 @@ export default function TmsDashboardPage() {
           <>
             <StatCard
               label="Active loads"
-              value={data.stats.activeLoads}
+              value={stats.activeLoads}
               sub="in pipeline now"
               icon={<Package size={17} />}
               tone="accent"
             />
             <StatCard
               label="Delivered this week"
-              value={data.stats.deliveredThisWeek}
+              value={stats.deliveredThisWeek}
               sub="completed deliveries"
               icon={<CheckCircle size={17} />}
               tone="success"
@@ -109,7 +167,7 @@ export default function TmsDashboardPage() {
             />
             <StatCard
               label="Revenue this week"
-              value={formatCurrency(data.stats.revenueThisWeek)}
+              value={formatCurrency(stats.revenueThisWeek)}
               sub="invoiced + pending"
               icon={<DollarSign size={17} />}
               tone="violet"
@@ -117,7 +175,7 @@ export default function TmsDashboardPage() {
             />
             <StatCard
               label="Outstanding AR"
-              value={formatCurrency(data.stats.outstandingAR)}
+              value={formatCurrency(stats.outstandingAR)}
               sub="unpaid invoices"
               icon={<Clock size={17} />}
               tone="warning"
@@ -137,11 +195,11 @@ export default function TmsDashboardPage() {
                 <Skeleton key={i} className="h-10 rounded-xl" />
               ))}
             </div>
-          ) : data.pipeline.length === 0 ? (
+          ) : pipeline.length === 0 ? (
             <p className="text-sm text-ink-secondary">No loads in pipeline.</p>
           ) : (
             <div className="space-y-2">
-              {data.pipeline.map((p) => (
+              {pipeline.map((p) => (
                 <Link
                   key={p.status}
                   href={`/tms/loads?view=${p.status}`}
@@ -168,11 +226,11 @@ export default function TmsDashboardPage() {
                 <Skeleton key={i} className="h-9 rounded-xl" />
               ))}
             </div>
-          ) : data.tasks.length === 0 ? (
+          ) : tasks.length === 0 ? (
             <p className="text-sm text-ink-secondary">You&apos;re all caught up.</p>
           ) : (
             <div className="space-y-1.5">
-              {data.tasks.map((t) => (
+              {tasks.map((t) => (
                 <Link
                   key={t.id}
                   href={t.link}
@@ -202,7 +260,7 @@ export default function TmsDashboardPage() {
       </div>
 
       {/* Empty CTA */}
-      {data && data.stats.activeLoads === 0 && !error && (
+      {data && stats.activeLoads === 0 && !error && (
         <div className="mt-10">
           <EmptyState
             icon={<Package size={24} />}

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
 import { requireModule } from "@/src/lib/auth";
 import { handleApiError } from "@/src/lib/api";
+import { LOAD_STATUSES } from "@/src/lib/tms/constants";
 
 export async function GET() {
   try {
@@ -19,6 +20,7 @@ export async function GET() {
       overdueInvoices,
       activeDrivers,
       fleetUnits,
+      deliveredThisWeek,
     ] = await Promise.all([
       prisma.tmsLoad.groupBy({
         by: ["status"],
@@ -77,6 +79,17 @@ export async function GET() {
       prisma.truck.count({
         where: { companyId, status: { not: "retired" } },
       }),
+
+      prisma.tmsLoad.count({
+        where: {
+          companyId,
+          status: "delivered",
+          OR: [
+            { pickupDate: { gte: weekAgo } },
+            { deliveryDate: { gte: weekAgo } },
+          ],
+        },
+      }),
     ]);
 
     const countsByStatus: Record<string, number> = {};
@@ -84,38 +97,62 @@ export async function GET() {
       countsByStatus[row.status] = row._count.id;
     }
 
-    const tasks = [];
+    const activeLoads =
+      (countsByStatus.pending ?? 0) +
+      (countsByStatus.assigned ?? 0) +
+      (countsByStatus.in_transit ?? 0) +
+      (countsByStatus.draft ?? 0) +
+      (countsByStatus.dispatched ?? 0);
+
+    const pipeline = LOAD_STATUSES.map((status) => ({
+      status,
+      count: countsByStatus[status] ?? 0,
+    }));
+
+    const tasks: {
+      id: string;
+      title: string;
+      link: string;
+      priority: string;
+    }[] = [];
+
     if (unassignedCount > 0) {
       tasks.push({
-        type: "unassigned_loads",
-        label: `${unassignedCount} unassigned load${unassignedCount === 1 ? "" : "s"}`,
-        count: unassignedCount,
-        href: "/tms/loads?view=unassigned",
+        id: "unassigned_loads",
+        title: `${unassignedCount} unassigned load${unassignedCount === 1 ? "" : "s"}`,
+        link: "/tms/loads?view=pending",
+        priority: "high",
       });
     }
     if (deliveredNoInvoice > 0) {
       tasks.push({
-        type: "delivered_no_invoice",
-        label: `${deliveredNoInvoice} delivered without invoice`,
-        count: deliveredNoInvoice,
-        href: "/tms/loads?view=unpaid",
+        id: "delivered_no_invoice",
+        title: `${deliveredNoInvoice} delivered without invoice`,
+        link: "/tms/loads?view=unpaid",
+        priority: "medium",
       });
     }
     if (overdueInvoices > 0) {
       tasks.push({
-        type: "overdue_invoices",
-        label: `${overdueInvoices} overdue invoice${overdueInvoices === 1 ? "" : "s"}`,
-        count: overdueInvoices,
-        href: "/tms/invoices?view=overdue",
+        id: "overdue_invoices",
+        title: `${overdueInvoices} overdue invoice${overdueInvoices === 1 ? "" : "s"}`,
+        link: "/tms/invoices?status=invoiced",
+        priority: "high",
       });
     }
 
     return NextResponse.json({
-      countsByStatus,
-      revenueThisWeek: revenueResult._sum.totalRevenue ?? 0,
-      outstandingAR: arResult._sum.balance ?? 0,
-      unassignedLoads: unassignedCount,
+      stats: {
+        activeLoads,
+        deliveredThisWeek,
+        revenueThisWeek: revenueResult._sum.totalRevenue ?? 0,
+        outstandingAR: arResult._sum.balance ?? 0,
+      },
       tasks,
+      pipeline,
+      // keep extras for future widgets
+      countsByStatus,
+      unassignedLoads: unassignedCount,
       activeDrivers,
       fleetUnits,
     });
