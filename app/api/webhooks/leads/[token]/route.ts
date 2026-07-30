@@ -30,7 +30,7 @@ export async function POST(request: Request, { params }: Params) {
 
   const lead = await prisma.lead.create({
     data: {
-      userId: jobAd.userId,
+      companyId: jobAd.companyId,
       jobAdId: jobAd.id,
       name,
       phone,
@@ -40,10 +40,9 @@ export async function POST(request: Request, { params }: Params) {
     },
   });
 
-  // Surface the new lead in the message center too
   await prisma.message.create({
     data: {
-      userId: jobAd.userId,
+      companyId: jobAd.companyId,
       direction: "inbound",
       channel: "system",
       contactName: name || "New lead",

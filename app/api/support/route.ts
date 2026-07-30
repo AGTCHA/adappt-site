@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
-import { requireUserId } from "@/src/lib/auth";
+import { requireSession } from "@/src/lib/auth";
 import { handleApiError } from "@/src/lib/api";
 
 export async function POST(request: Request) {
   try {
-    const userId = await requireUserId();
+    const session = await requireSession();
     const body = await request.json().catch(() => ({}));
 
     const type = ["feedback", "bug", "support"].includes(body.type)
@@ -22,7 +22,13 @@ export async function POST(request: Request) {
     }
 
     const ticket = await prisma.supportTicket.create({
-      data: { userId, type, subject, body: text },
+      data: {
+        companyId: session.companyId,
+        userId: session.userId,
+        type,
+        subject,
+        body: text,
+      },
     });
 
     return NextResponse.json({ ticket }, { status: 201 });

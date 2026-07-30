@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
-import { requireUserId } from "@/src/lib/auth";
+import { requireModule } from "@/src/lib/auth";
 import { handleApiError } from "@/src/lib/api";
 
 export async function GET(request: Request) {
   try {
-    const userId = await requireUserId();
+    const { companyId } = await requireModule("recruiting");
     const { searchParams } = new URL(request.url);
     const jobAdId = searchParams.get("jobAdId");
 
     const leads = await prisma.lead.findMany({
-      where: { userId, ...(jobAdId ? { jobAdId } : {}) },
+      where: { companyId, ...(jobAdId ? { jobAdId } : {}) },
       orderBy: { createdAt: "desc" },
       take: 200,
       include: { jobAd: { select: { id: true, title: true } } },

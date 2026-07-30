@@ -7,10 +7,20 @@ const SESSION_COOKIE = "adapt_session";
 const PROTECTED_PREFIXES = [
   "/dashboard",
   "/drivers",
+  "/leads",
+  "/recruiting",
   "/fleet",
+  "/maintenance",
   "/job-ads",
   "/messages",
   "/support",
+  "/tms",
+  "/dispatch",
+  "/crm",
+  "/office",
+  "/portal",
+  "/settings",
+  "/platform",
 ];
 
 function getSecret() {
@@ -34,9 +44,13 @@ async function isAuthenticated(request: NextRequest) {
   }
 }
 
+const PUBLIC_PREFIXES = ["/sign/", "/tms/track/", "/api/tms/track/", "/api/tms/rate-cons/"];
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
+  const isPublic = PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
+  const isProtected =
+    !isPublic && PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
 
   if (isProtected) {
     const authed = await isAuthenticated(request);
@@ -61,10 +75,20 @@ export const config = {
   matcher: [
     "/dashboard/:path*",
     "/drivers/:path*",
+    "/leads/:path*",
+    "/recruiting/:path*",
     "/fleet/:path*",
+    "/maintenance/:path*",
     "/job-ads/:path*",
     "/messages/:path*",
     "/support/:path*",
+    "/tms/:path*",
+    "/dispatch/:path*",
+    "/crm/:path*",
+    "/office/:path*",
+    "/portal/:path*",
+    "/settings/:path*",
+    "/platform/:path*",
     "/login",
     "/signup",
   ],

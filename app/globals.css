@@ -4,55 +4,59 @@
 
 :root {
   /* ── Light theme ─────────────────────────────── */
-  --bg: #f5f6f8;
-  --bg-gradient-a: rgba(59, 108, 246, 0.06);
-  --bg-gradient-b: rgba(139, 122, 255, 0.05);
-  --surface: rgba(255, 255, 255, 0.72);
+  --bg: #f3f5f9;
+  --bg-gradient-a: rgba(47, 94, 234, 0.11);
+  --bg-gradient-b: rgba(124, 92, 255, 0.09);
+  --surface: rgba(255, 255, 255, 0.78);
   --surface-solid: #ffffff;
-  --surface-raised: rgba(255, 255, 255, 0.9);
-  --border: rgba(15, 23, 42, 0.08);
-  --border-strong: rgba(15, 23, 42, 0.14);
+  --surface-raised: rgba(255, 255, 255, 0.94);
+  --border: rgba(15, 23, 42, 0.09);
+  --border-strong: rgba(15, 23, 42, 0.16);
   --text: #0f1420;
-  --text-secondary: #4b5565;
-  --text-tertiary: #8a93a5;
+  --text-secondary: #3f4a5c;
+  --text-tertiary: #7a8498;
   --accent: #2f5eea;
   --accent-hover: #244fd0;
-  --accent-soft: rgba(47, 94, 234, 0.1);
+  --accent-soft: rgba(47, 94, 234, 0.12);
   --accent-text: #ffffff;
-  --success: #0f9d6c;
-  --success-soft: rgba(15, 157, 108, 0.12);
+  --violet: #7c5cff;
+  --violet-soft: rgba(124, 92, 255, 0.12);
+  --success: #0d9f6e;
+  --success-soft: rgba(13, 159, 110, 0.13);
   --warning: #c47f0e;
-  --warning-soft: rgba(196, 127, 14, 0.12);
+  --warning-soft: rgba(196, 127, 14, 0.14);
   --danger: #dc3d43;
-  --danger-soft: rgba(220, 61, 67, 0.1);
-  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -8px rgba(15, 23, 42, 0.08);
-  --shadow-raised: 0 2px 6px rgba(15, 23, 42, 0.06), 0 24px 48px -16px rgba(15, 23, 42, 0.18);
+  --danger-soft: rgba(220, 61, 67, 0.11);
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 28px -10px rgba(15, 23, 42, 0.1);
+  --shadow-raised: 0 2px 8px rgba(15, 23, 42, 0.07), 0 28px 52px -18px rgba(15, 23, 42, 0.2);
   --ring: rgba(47, 94, 234, 0.35);
 }
 
 .dark {
   /* ── Dark theme ──────────────────────────────── */
   --bg: #0a0d13;
-  --bg-gradient-a: rgba(64, 112, 255, 0.08);
-  --bg-gradient-b: rgba(139, 122, 255, 0.06);
-  --surface: rgba(22, 27, 38, 0.66);
+  --bg-gradient-a: rgba(91, 139, 255, 0.12);
+  --bg-gradient-b: rgba(139, 122, 255, 0.1);
+  --surface: rgba(22, 27, 38, 0.72);
   --surface-solid: #141924;
-  --surface-raised: rgba(28, 34, 47, 0.92);
-  --border: rgba(226, 232, 240, 0.08);
-  --border-strong: rgba(226, 232, 240, 0.16);
+  --surface-raised: rgba(28, 34, 47, 0.94);
+  --border: rgba(226, 232, 240, 0.09);
+  --border-strong: rgba(226, 232, 240, 0.18);
   --text: #eef1f6;
-  --text-secondary: #9aa4b6;
-  --text-tertiary: #626c7f;
+  --text-secondary: #a3adc0;
+  --text-tertiary: #6b758a;
   --accent: #5b8bff;
   --accent-hover: #79a1ff;
-  --accent-soft: rgba(91, 139, 255, 0.14);
+  --accent-soft: rgba(91, 139, 255, 0.16);
   --accent-text: #0a0d13;
+  --violet: #a78bfa;
+  --violet-soft: rgba(167, 139, 250, 0.16);
   --success: #34cf95;
-  --success-soft: rgba(52, 207, 149, 0.14);
+  --success-soft: rgba(52, 207, 149, 0.15);
   --warning: #e6a53c;
-  --warning-soft: rgba(230, 165, 60, 0.14);
+  --warning-soft: rgba(230, 165, 60, 0.15);
   --danger: #ff5d63;
-  --danger-soft: rgba(255, 93, 99, 0.12);
+  --danger-soft: rgba(255, 93, 99, 0.13);
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -8px rgba(0, 0, 0, 0.5);
   --shadow-raised: 0 2px 6px rgba(0, 0, 0, 0.4), 0 24px 48px -16px rgba(0, 0, 0, 0.7);
   --ring: rgba(91, 139, 255, 0.45);
@@ -72,6 +76,8 @@
   --color-accent-hover: var(--accent-hover);
   --color-accent-soft: var(--accent-soft);
   --color-accent-text: var(--accent-text);
+  --color-violet: var(--violet);
+  --color-violet-soft: var(--violet-soft);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
   --color-warning: var(--warning);
@@ -182,4 +188,34 @@ body {
 
 ::selection {
   background: var(--accent-soft);
+}
+
+/* Stage / status column accents for kanban boards */
+.stage-rail-accent {
+  background: linear-gradient(180deg, var(--accent-soft), transparent 70%);
+  border-top: 3px solid var(--accent);
+}
+.stage-rail-warning {
+  background: linear-gradient(180deg, var(--warning-soft), transparent 70%);
+  border-top: 3px solid var(--warning);
+}
+.stage-rail-violet {
+  background: linear-gradient(180deg, var(--violet-soft), transparent 70%);
+  border-top: 3px solid var(--violet);
+}
+.stage-rail-success {
+  background: linear-gradient(180deg, var(--success-soft), transparent 70%);
+  border-top: 3px solid var(--success);
+}
+.stage-rail-danger {
+  background: linear-gradient(180deg, var(--danger-soft), transparent 70%);
+  border-top: 3px solid var(--danger);
+}
+.stage-rail-neutral {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.04), transparent 70%);
+  border-top: 3px solid var(--border-strong);
+}
+
+.dark .stage-rail-neutral {
+  background: linear-gradient(180deg, rgba(226, 232, 240, 0.06), transparent 70%);
 }

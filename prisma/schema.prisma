@@ -4,47 +4,163 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  name         String
-  companyName  String
-  createdAt    DateTime @default(now())
+// ── Platform / tenancy ────────────────────────────────────────────────────────
 
-  drivers     Driver[]
-  trucks      Truck[]
-  jobAds      JobAd[]
-  leads       Lead[]
-  messages    Message[]
-  maintenance MaintenanceRecord[]
-  tickets     SupportTicket[]
+model Company {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String   @unique
+  logoUrl          String   @default("")
+  enabledModules   String   @default("recruiting,fleet,tms")
+  plan             String   @default("trial")
+  stripeCustomerId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  memberships              CompanyMembership[]
+  invites                  CompanyInvite[]
+  integrationCredentials   IntegrationCredential[]
+  storedFiles              StoredFile[]
+  drivers                  Driver[]
+  trucks                   Truck[]
+  jobAds                   JobAd[]
+  leads                    Lead[]
+  messages                 Message[]
+  hireSources              HireSource[]
+  maintenance              MaintenanceRecord[]
+  workOrders               WorkOrder[]
+  vendors                  Vendor[]
+  servicePrograms          ServiceProgram[]
+  odometerSnapshots        OdometerSnapshot[]
+  maintenanceDocuments     MaintenanceDocument[]
+  tickets                  SupportTicket[]
+  tmsLoads                 TmsLoad[]
+  tmsCustomers             TmsCustomer[]
+  tmsInvoices              TmsInvoice[]
+  tmsSettlements           TmsSettlement[]
+  tmsPayRules              TmsDriverPayRule[]
+  tmsDocuments             TmsDocument[]
+  tmsTrailers              TmsTrailer[]
+  tmsMessages              TmsMessage[]
+  tmsNotifications         TmsNotification[]
+  tmsNotes                 TmsDispatcherNote[]
+  tmsEdiPartners           TmsEdiPartner[]
+  tmsEdiMessages           TmsEdiMessage[]
+  tmsEdiInbox              TmsEdiInboxItem[]
+  tmsLoadboardCredentials  TmsLoadboardCredential[]
+  tmsRateConSignatures     TmsRateConSignature[]
+  tmsSettings              TmsCompanySettings?
+  tmsRecurringItems        TmsRecurringItem[]
+  tmsEscrowAccounts        TmsEscrowAccount[]
+  tmsAdjustments           TmsSettlementAdjustment[]
+  tmsExpenses              TmsExpense[]
+  crmCustomers             CrmCustomer[]
+  hrEmployees              HrEmployee[]
 }
 
-model Driver {
-  id        String  @id @default(cuid())
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  passwordHash    String
+  name            String
+  isPlatformAdmin Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  memberships CompanyMembership[]
+}
+
+model CompanyMembership {
+  id        String   @id @default(cuid())
+  companyId String
   userId    String
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String   @default("viewer")
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId])
+  @@index([userId])
+}
+
+model CompanyInvite {
+  id         String    @id @default(cuid())
+  companyId  String
+  email      String
+  role       String    @default("viewer")
+  token      String    @unique
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, email])
+}
+
+model IntegrationCredential {
+  id               String   @id @default(cuid())
+  companyId        String
+  provider         String
+  encryptedPayload String   @default("{}")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, provider])
+}
+
+model StoredFile {
+  id        String   @id @default(cuid())
+  companyId String
+  key       String
+  fileName  String
+  mimeType  String
+  sizeBytes Int      @default(0)
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, key])
+}
+
+// ── Recruiting ────────────────────────────────────────────────────────────────
+
+model Driver {
+  id        String @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   firstName String
   lastName  String
   phone     String  @default("")
   email     String  @default("")
 
-  // applicant | onboarding | active | inactive
-  status String @default("applicant")
-
-  // Recruiting info
+  status         String @default("applicant")
+  pipelineStage  String @default("lead")
   experienceYears Int?
   endorsements    String @default("")
   preferredRoute  String @default("")
   source          String @default("manual")
+  hireSource      String @default("")
+  hireSourceOther String @default("")
+  driverType      String @default("")
+  city            String @default("")
+  state           String @default("")
+  dateOfBirth     DateTime?
+  emergencyContact String @default("")
+  employersJson   String @default("[]")
   notes           String @default("")
 
-  // Safety & compliance
+  followUpAt      DateTime?
+  archivedAt      DateTime?
+  terminalReason  String @default("")
+  terminalKind    String @default("")
+
   cdlNumber     String    @default("")
   cdlState      String    @default("")
   cdlExpiry     DateTime?
@@ -56,132 +172,905 @@ model Driver {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  documents Document[]
-  truck     Truck?
-  messages  Message[]
+  documents       Document[]
+  driverNotes     DriverNote[]
+  truck           Truck?
+  messages        Message[]
+  tmsLoads        TmsLoad[]
+  tmsPayRules     TmsDriverPayRule[]
+  tmsSettlements  TmsSettlement[]
+  tmsRecurringItems TmsRecurringItem[]
+  tmsEscrowAccounts TmsEscrowAccount[]
+  tmsAdjustments  TmsSettlementAdjustment[]
+  tmsMessages     TmsMessage[]
+  portalPinHash   String   @default("")
+  portalPinSetAt  DateTime?
+  dispatcherName  String   @default("")
+  hometimeAgreement String @default("")
+
+  @@index([companyId, status])
+  @@index([companyId, pipelineStage])
+  @@index([companyId, followUpAt])
+}
+
+model DriverNote {
+  id        String   @id @default(cuid())
+  driverId  String
+  driver    Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  body      String
+  kind      String   @default("note")
+  userId    String   @default("")
+  userName  String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([driverId, createdAt])
+}
+
+model HireSource {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, name])
+  @@index([companyId])
 }
 
 model Document {
-  id       String @id @default(cuid())
-  driverId String
-  driver   Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
-
-  // cdl | medcard | other
-  type      String
-  fileName  String
-  mimeType  String
-  data      String // base64
-  extracted String @default("") // JSON from AI extraction
-  createdAt DateTime @default(now())
+  id           String @id @default(cuid())
+  driverId     String
+  driver       Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  type         String
+  fileName     String
+  mimeType     String
+  storageKey   String @default("")
+  data         String @default("")
+  extracted    String @default("")
+  reviewStatus String @default("pending")
+  createdAt    DateTime @default(now())
 }
+
+model JobAd {
+  id           String @id @default(cuid())
+  companyId    String
+  company      Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title        String
+  description  String @default("")
+  payRange     String @default("")
+  location     String @default("")
+  status       String @default("active")
+  webhookToken String @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  leads        Lead[]
+}
+
+model Lead {
+  id              String @id @default(cuid())
+  companyId       String
+  company         Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  jobAdId         String
+  jobAd           JobAd  @relation(fields: [jobAdId], references: [id], onDelete: Cascade)
+  name            String @default("")
+  phone           String @default("")
+  email           String @default("")
+  source          String @default("webhook")
+  payload         String @default("")
+  status          String @default("new")
+  disposition     String @default("new")
+  dispositionNote String @default("")
+  followUpAt      DateTime?
+  convertedDriverId String @default("")
+  createdAt       DateTime @default(now())
+
+  @@index([companyId, disposition])
+}
+
+model Message {
+  id          String  @id @default(cuid())
+  companyId   String
+  company     Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  driverId    String?
+  driver      Driver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  direction   String
+  channel     String
+  contactName String  @default("")
+  body        String
+  createdAt   DateTime @default(now())
+}
+
+// ── Fleet / Maintenance ───────────────────────────────────────────────────────
 
 model Truck {
   id         String @id @default(cuid())
-  userId     String
-  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId  String
+  company    Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   unitNumber String
   year       Int
   make       String
   model      String
   vin        String @default("")
   mileage    Int    @default(0)
+  status     String @default("active")
+  driverId   String? @unique
+  driver     Driver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  // active | in_shop | inactive
-  status String @default("active")
+  maintenance       MaintenanceRecord[]
+  workOrders        WorkOrder[]
+  servicePrograms   ServiceProgram[]
+  odometerSnapshots OdometerSnapshot[]
+  documents         MaintenanceDocument[]
+  tmsLoads          TmsLoad[]
 
-  driverId String? @unique
-  driver   Driver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  maintenance MaintenanceRecord[]
+  @@index([companyId])
 }
 
 model MaintenanceRecord {
-  id      String @id @default(cuid())
-  truckId String
-  truck   Truck  @relation(fields: [truckId], references: [id], onDelete: Cascade)
-  userId  String
-  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String   @id @default(cuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  truckId         String
+  truck           Truck    @relation(fields: [truckId], references: [id], onDelete: Cascade)
+  workOrderId     String?
+  workOrder       WorkOrder? @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
+  date            DateTime @default(now())
+  vendor          String   @default("")
+  description     String   @default("")
+  amount          Float
+  category        String   @default("preventative")
+  odometer        Int?
+  invoiceFileName String   @default("")
+  extracted       String   @default("")
+  createdAt       DateTime @default(now())
+}
 
-  date        DateTime @default(now())
-  vendor      String   @default("")
-  description String   @default("")
+model Vendor {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name      String
+  phone     String   @default("")
+  email     String   @default("")
+  address   String   @default("")
+  city      String   @default("")
+  state     String   @default("")
+  notes     String   @default("")
+  createdAt DateTime @default(now())
+
+  workOrders WorkOrder[]
+}
+
+model WorkOrder {
+  id               String    @id @default(cuid())
+  companyId        String
+  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  truckId          String
+  truck            Truck     @relation(fields: [truckId], references: [id], onDelete: Cascade)
+  vendorId         String?
+  vendor           Vendor?   @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  woNumber         String    @default("")
+  status           String    @default("open")
+  title            String
+  description      String    @default("")
+  notes            String    @default("")
+  invoiceRef       String    @default("")
+  totalAmount      Float     @default(0)
+  odometer         Int?
+  category         String    @default("preventative")
+  completedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  lines       WorkOrderLine[]
+  maintenance MaintenanceRecord[]
+  documents   MaintenanceDocument[]
+
+  @@index([companyId, status])
+  @@index([companyId, woNumber])
+}
+
+model WorkOrderLine {
+  id          String  @id @default(cuid())
+  workOrderId String
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  description String
   amount      Float
-  // preventative | accident
-  category  String @default("preventative")
-  odometer  Int?
-  invoiceFileName String @default("")
-  extracted       String @default("") // raw JSON from AI invoice extraction
-
-  createdAt DateTime @default(now())
+  partNumber  String  @default("")
+  laborHours  Float?
+  vmrsCode    String  @default("")
+  isPm        Boolean @default(false)
+  isDot       Boolean @default(false)
 }
 
-model JobAd {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+model MaintenanceDocument {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  truckId     String?
+  truck       Truck?   @relation(fields: [truckId], references: [id], onDelete: SetNull)
+  workOrderId String?
+  workOrder   WorkOrder? @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
+  fileName    String
+  mimeType    String
+  storageKey  String   @default("")
+  data        String   @default("")
+  status      String   @default("pending")
+  extracted   String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  title        String
-  description  String @default("")
-  payRange     String @default("")
-  location     String @default("")
-  // active | paused | closed
-  status       String @default("active")
-  webhookToken String @unique
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  leads Lead[]
+  @@index([companyId, status])
 }
 
-model Lead {
-  id      String @id @default(cuid())
-  userId  String
-  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  jobAdId String
-  jobAd   JobAd  @relation(fields: [jobAdId], references: [id], onDelete: Cascade)
-
-  name    String @default("")
-  phone   String @default("")
-  email   String @default("")
-  source  String @default("webhook")
-  payload String @default("")
-  // new | contacted | converted | dismissed
-  status String @default("new")
-
-  createdAt DateTime @default(now())
+model ServiceProgram {
+  id              String    @id @default(cuid())
+  companyId       String
+  company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  truckId         String?
+  truck           Truck?    @relation(fields: [truckId], references: [id], onDelete: SetNull)
+  name            String
+  intervalMiles   Int?
+  intervalDays    Int?
+  lastCompletedAt DateTime?
+  nextDueAt       DateTime?
+  nextDueMiles     Int?
+  createdAt       DateTime  @default(now())
 }
 
-model Message {
-  id       String  @id @default(cuid())
-  userId   String
-  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  driverId String?
-  driver   Driver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
+model OdometerSnapshot {
+  id         String   @id @default(cuid())
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  truckId    String
+  truck      Truck    @relation(fields: [truckId], references: [id], onDelete: Cascade)
+  reading    Int
+  recordedAt DateTime @default(now())
+  source     String   @default("manual")
 
-  // inbound | outbound
-  direction String
-  // sms | call | ai_call | email | system
-  channel     String
-  contactName String @default("")
-  body        String
-
-  createdAt DateTime @default(now())
+  @@index([truckId, recordedAt])
 }
+
+// ── TMS (Forge parity) ────────────────────────────────────────────────────────
+
+model TmsCustomer {
+  id            String   @id @default(cuid())
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name          String
+  mcNumber      String   @default("")
+  dotNumber     String   @default("")
+  address       String   @default("")
+  city          String   @default("")
+  state         String   @default("")
+  zip           String   @default("")
+  contactName   String   @default("")
+  contactEmail  String   @default("")
+  contactPhone  String   @default("")
+  creditRating  String   @default("B")
+  paymentTerms  Int      @default(30)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  loads    TmsLoad[]
+  invoices TmsInvoice[]
+
+  @@index([companyId, name])
+}
+
+model TmsLoad {
+  id                 String    @id @default(cuid())
+  companyId          String
+  company            Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  loadNumber         String
+  status             String    @default("pending")
+  customerId         String?
+  customer           TmsCustomer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName       String    @default("")
+  billTo             String    @default("")
+  customerReference  String    @default("")
+  bolNumber          String    @default("")
+  poNumber           String    @default("")
+  proNumber          String    @default("")
+  equipmentType      String    @default("dry_van")
+  commodity          String    @default("")
+  weight             Float?
+  pieces             Int?
+  palletCount        Int?
+  hazmat             Boolean   @default(false)
+  hazmatUnNumber     String    @default("")
+  temperatureMin     Float?
+  temperatureMax     Float?
+  linehaulRevenue    Float     @default(0)
+  fuelSurcharge      Float     @default(0)
+  accessorialCharges Float     @default(0)
+  totalRevenue       Float     @default(0)
+  loadedMiles        Float     @default(0)
+  emptyMiles         Float     @default(0)
+  totalMiles         Float     @default(0)
+  ratePerMile        Float?
+  driverPay          Float     @default(0)
+  fuelCost           Float     @default(0)
+  tollCost           Float     @default(0)
+  insuranceCost      Float     @default(0)
+  otherCosts         Float     @default(0)
+  totalCost          Float     @default(0)
+  grossMargin        Float     @default(0)
+  marginPercentage   Float?
+  /// @deprecated use totalRevenue — kept for older clients
+  rate               Float?
+  /// @deprecated use totalMiles
+  miles              Float?
+  driverId           String?
+  driver             Driver?   @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  truckId            String?
+  truck              Truck?    @relation(fields: [truckId], references: [id], onDelete: SetNull)
+  trailerId          String?
+  trailer            TmsTrailer? @relation(fields: [trailerId], references: [id], onDelete: SetNull)
+  origin             String    @default("")
+  destination        String    @default("")
+  pickupDate         DateTime?
+  deliveryDate       DateTime?
+  pickupAppointment  DateTime?
+  deliveryAppointment DateTime?
+  notes              String    @default("")
+  specialInstructions String   @default("")
+  invoiceStatus      String    @default("pending")
+  trackingToken      String?   @unique
+  trackingTokenExpiresAt DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  stops       TmsStop[]
+  documents   TmsDocument[]
+  invoices    TmsInvoice[]
+  messages    TmsMessage[]
+  expenses    TmsExpense[]
+  signatures  TmsRateConSignature[]
+  settlementLines TmsSettlementLine[]
+
+  @@index([companyId, status])
+  @@index([companyId, loadNumber])
+  @@index([companyId, driverId])
+}
+
+model TmsStop {
+  id                   String    @id @default(cuid())
+  loadId               String
+  load                 TmsLoad   @relation(fields: [loadId], references: [id], onDelete: Cascade)
+  sequence             Int
+  type                 String
+  locationName         String    @default("")
+  address              String    @default("")
+  city                 String    @default("")
+  state                String    @default("")
+  zip                  String    @default("")
+  contactName          String    @default("")
+  contactPhone         String    @default("")
+  contactEmail         String    @default("")
+  appointmentRequired  Boolean   @default(false)
+  appointmentStart     DateTime?
+  appointmentEnd       DateTime?
+  referenceNumber      String    @default("")
+  instructions         String    @default("")
+  scheduledAt          DateTime?
+  arrivedAt            DateTime?
+  departedAt           DateTime?
+
+  @@index([loadId, sequence])
+}
+
+model TmsTrailer {
+  id           String    @id @default(cuid())
+  companyId    String
+  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name         String
+  trailerNumber String   @default("")
+  type         String    @default("dry_van")
+  year         Int?
+  make         String    @default("")
+  model        String    @default("")
+  vin          String    @default("")
+  licensePlate String    @default("")
+  isActive     Boolean   @default(true)
+  archivedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  loads TmsLoad[]
+
+  @@index([companyId, isActive])
+}
+
+model TmsDocument {
+  id               String    @id @default(cuid())
+  companyId        String
+  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  loadId           String?
+  load             TmsLoad?  @relation(fields: [loadId], references: [id], onDelete: Cascade)
+  type             String
+  fileName         String
+  mimeType         String    @default("application/octet-stream")
+  storageKey       String    @default("")
+  dataBase64       String    @default("")
+  title            String    @default("")
+  notes            String    @default("")
+  validationStatus String    @default("uploaded")
+  uploadedBy       String    @default("")
+  createdAt        DateTime  @default(now())
+
+  @@index([companyId, loadId])
+}
+
+model TmsInvoice {
+  id              String    @id @default(cuid())
+  companyId       String
+  company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  loadId          String?
+  load            TmsLoad?  @relation(fields: [loadId], references: [id], onDelete: SetNull)
+  customerId      String?
+  customer        TmsCustomer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  invoiceNumber   String
+  status          String    @default("invoiced")
+  invoiceDate     DateTime  @default(now())
+  dueDate         DateTime?
+  subtotal        Float     @default(0)
+  total           Float     @default(0)
+  amountPaid      Float     @default(0)
+  balance         Float     @default(0)
+  agingBucket     String    @default("current")
+  billToName      String    @default("")
+  billToAddress   String    @default("")
+  billToCity      String    @default("")
+  billToState     String    @default("")
+  billToZip       String    @default("")
+  billToEmail     String    @default("")
+  notes           String    @default("")
+  sentAt          DateTime?
+  sentToEmail     String    @default("")
+  factorSentAt    DateTime?
+  factorSentToEmail String  @default("")
+  voidedAt        DateTime?
+  voidReason      String    @default("")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  lineItems TmsInvoiceLine[]
+  payments  TmsInvoicePayment[]
+
+  @@unique([companyId, invoiceNumber])
+  @@index([companyId, status])
+}
+
+model TmsInvoiceLine {
+  id          String     @id @default(cuid())
+  invoiceId   String
+  invoice     TmsInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  chargeCode  String     @default("FRT")
+  description String
+  quantity    Float      @default(1)
+  rate        Float      @default(0)
+  amount      Float      @default(0)
+  sortOrder   Int        @default(0)
+}
+
+model TmsInvoicePayment {
+  id          String     @id @default(cuid())
+  invoiceId   String
+  invoice     TmsInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount      Float
+  paymentDate DateTime   @default(now())
+  method      String     @default("ach")
+  reference   String     @default("")
+  notes       String     @default("")
+  recordedBy  String     @default("")
+  createdAt   DateTime   @default(now())
+}
+
+model TmsDriverPayRule {
+  id                    String    @id @default(cuid())
+  companyId             String
+  company               Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  driverId              String?
+  driver                Driver?   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  ruleType              String
+  ratePerMile           Float?
+  ratePerMileEmpty      Float?
+  ratePerLoadPct        Float?
+  rateHourly            Float?
+  rateFlat              Float?
+  salaryWeekly          Float?
+  teamSharePct          Float?
+  detentionPerHour      Float?
+  detentionFreeHours    Int       @default(2)
+  layoverFlat           Float?
+  stopPay               Float?
+  effectiveFrom         DateTime  @default(now())
+  effectiveTo           DateTime?
+  isActive              Boolean   @default(true)
+  notes                 String    @default("")
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([companyId, driverId, isActive])
+}
+
+model TmsSettlement {
+  id              String    @id @default(cuid())
+  companyId       String
+  company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  driverId        String
+  driver          Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  settlementNumber String
+  periodStart     DateTime
+  periodEnd       DateTime
+  loadCount       Int       @default(0)
+  totalMilesLoaded Float    @default(0)
+  totalMilesEmpty  Float    @default(0)
+  grossPay        Float     @default(0)
+  deductions      Float     @default(0)
+  netPay          Float     @default(0)
+  status          String    @default("draft")
+  paidVia         String    @default("")
+  paidReference   String    @default("")
+  paidAt          DateTime?
+  approvedAt      DateTime?
+  approvedBy      String    @default("")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  lines TmsSettlementLine[]
+  adjustments TmsSettlementAdjustment[]
+
+  @@unique([companyId, settlementNumber])
+  @@index([companyId, status])
+}
+
+model TmsSettlementLine {
+  id           String        @id @default(cuid())
+  settlementId String
+  settlement   TmsSettlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  loadId       String?
+  load         TmsLoad?      @relation(fields: [loadId], references: [id], onDelete: SetNull)
+  lineType     String
+  description  String
+  quantity     Float         @default(1)
+  rate         Float         @default(0)
+  amount       Float         @default(0)
+  createdAt    DateTime      @default(now())
+}
+
+model TmsRecurringItem {
+  id              String    @id @default(cuid())
+  companyId       String
+  company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  driverId        String
+  driver          Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  kind            String
+  description     String
+  amount          Float?
+  pctOfGross      Float?
+  escrowAccountId String?
+  escrowAccount   TmsEscrowAccount? @relation(fields: [escrowAccountId], references: [id], onDelete: SetNull)
+  totalBalance    Float?
+  remainingBalance Float?
+  isActive        Boolean   @default(true)
+  startDate       DateTime  @default(now())
+  endDate         DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([companyId, driverId])
+}
+
+model TmsEscrowAccount {
+  id           String   @id @default(cuid())
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  driverId     String
+  driver       Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  name         String
+  targetAmount Float?
+  balance      Float    @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  recurringItems TmsRecurringItem[]
+  transactions   TmsEscrowTxn[]
+
+  @@index([companyId, driverId])
+}
+
+model TmsEscrowTxn {
+  id              String          @id @default(cuid())
+  escrowAccountId String
+  escrowAccount   TmsEscrowAccount @relation(fields: [escrowAccountId], references: [id], onDelete: Cascade)
+  amount          Float
+  balanceAfter    Float
+  description     String          @default("")
+  createdBy       String          @default("")
+  createdAt       DateTime        @default(now())
+}
+
+model TmsSettlementAdjustment {
+  id           String         @id @default(cuid())
+  companyId    String
+  company      Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  driverId     String
+  driver       Driver         @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  settlementId String?
+  settlement   TmsSettlement? @relation(fields: [settlementId], references: [id], onDelete: SetNull)
+  kind         String
+  description  String
+  amount       Float
+  entryDate    DateTime       @default(now())
+  createdBy    String         @default("")
+  createdAt    DateTime       @default(now())
+
+  @@index([companyId, driverId])
+}
+
+model TmsExpense {
+  id          String    @id @default(cuid())
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  loadId      String?
+  load        TmsLoad?  @relation(fields: [loadId], references: [id], onDelete: SetNull)
+  driverId    String?
+  category    String
+  amount      Float
+  description String    @default("")
+  expenseDate DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+
+  @@index([companyId, loadId])
+}
+
+model TmsMessage {
+  id         String   @id @default(cuid())
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  loadId     String?
+  load       TmsLoad? @relation(fields: [loadId], references: [id], onDelete: SetNull)
+  driverId   String?
+  driver     Driver?  @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  direction  String
+  body       String
+  attachmentName String @default("")
+  attachmentData String @default("")
+  readAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([companyId, driverId, createdAt])
+}
+
+model TmsNotification {
+  id        String    @id @default(cuid())
+  companyId String
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title     String
+  body      String    @default("")
+  href      String    @default("")
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([companyId, readAt])
+}
+
+model TmsDispatcherNote {
+  id         String    @id @default(cuid())
+  companyId  String
+  company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title      String    @default("")
+  body       String
+  priority   String    @default("normal")
+  dueAt      DateTime?
+  createdBy  String    @default("")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([companyId])
+}
+
+model TmsRateConSignature {
+  id            String    @id @default(cuid())
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  loadId        String
+  load          TmsLoad   @relation(fields: [loadId], references: [id], onDelete: Cascade)
+  token         String    @unique
+  recipientEmail String   @default("")
+  status        String    @default("pending")
+  signMethod    String    @default("click")
+  signerName    String    @default("")
+  signedAt      DateTime?
+  expiresAt     DateTime?
+  revokedAt     DateTime?
+  note          String    @default("")
+  auditJson     String    @default("[]")
+  createdAt     DateTime  @default(now())
+
+  @@index([companyId, loadId])
+}
+
+model TmsEdiPartner {
+  id           String   @id @default(cuid())
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name         String
+  scac         String   @default("")
+  transport    String   @default("sftp")
+  isEnabled    Boolean  @default(true)
+  circuitOpen  Boolean  @default(false)
+  configJson   String   @default("{}")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  messages TmsEdiMessage[]
+  inbox    TmsEdiInboxItem[]
+
+  @@index([companyId])
+}
+
+model TmsEdiMessage {
+  id              String   @id @default(cuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  partnerId       String?
+  partner         TmsEdiPartner? @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  direction       String
+  transactionSet  String
+  status          String   @default("received")
+  loadNumber      String   @default("")
+  rawX12          String   @default("")
+  explanation     String   @default("")
+  createdAt       DateTime @default(now())
+
+  @@index([companyId, createdAt])
+}
+
+model TmsEdiInboxItem {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  partnerId   String?
+  partner     TmsEdiPartner? @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  status      String   @default("pending")
+  origin      String   @default("")
+  destination String   @default("")
+  pickupDate  DateTime?
+  rate        Float?
+  equipment   String   @default("dry_van")
+  rawPayload  String   @default("{}")
+  declineReason String @default("")
+  loadId      String   @default("")
+  createdAt   DateTime @default(now())
+
+  @@index([companyId, status])
+}
+
+model TmsLoadboardCredential {
+  id           String   @id @default(cuid())
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  provider     String
+  label        String   @default("")
+  isEnabled    Boolean  @default(true)
+  credentialsJson String @default("{}")
+  lastTestAt   DateTime?
+  lastTestOk   Boolean?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([companyId, provider])
+}
+
+model TmsCompanySettings {
+  id                 String   @id @default(cuid())
+  companyId          String   @unique
+  company            Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  dotNumber          String   @default("")
+  mcNumber           String   @default("")
+  scac               String   @default("")
+  factorCompanyName  String   @default("")
+  factorSubmitEmail  String   @default("")
+  remitToName        String   @default("")
+  remitToAddress     String   @default("")
+  remitToCity        String   @default("")
+  remitToState       String   @default("")
+  remitToZip         String   @default("")
+  noticeOfAssignment String   @default("")
+  telematicsProvider String   @default("")
+  onboardingStep     String   @default("identity")
+  onboardingComplete Boolean  @default(false)
+  highwayApiKey      String   @default("")
+  highwayEnv         String   @default("staging")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+// ── CRM (single company per tenant) ───────────────────────────────────────────
+
+model CrmCustomer {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name        String
+  contactName String   @default("")
+  phone       String   @default("")
+  email       String   @default("")
+  dotNumber   String   @default("")
+  mcNumber    String   @default("")
+  stage       String   @default("lead")
+  notes       String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  deals CrmDeal[]
+
+  @@index([companyId, stage])
+}
+
+model CrmDeal {
+  id            String     @id @default(cuid())
+  companyId     String
+  customerId    String
+  customer      CrmCustomer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  title         String
+  value         Float?
+  stage         String     @default("prospect")
+  expectedClose DateTime?
+  createdAt     DateTime   @default(now())
+}
+
+// ── Office / HR ───────────────────────────────────────────────────────────────
+
+model HrEmployee {
+  id         String    @id @default(cuid())
+  companyId  String
+  company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId     String?
+  firstName  String
+  lastName   String
+  email      String    @default("")
+  phone      String    @default("")
+  title      String    @default("")
+  department String    @default("")
+  startDate  DateTime?
+  status     String    @default("active")
+  createdAt  DateTime  @default(now())
+
+  ptoRequests PtoRequest[]
+}
+
+model PtoRequest {
+  id         String     @id @default(cuid())
+  companyId  String
+  employeeId String
+  employee   HrEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  startDate  DateTime
+  endDate    DateTime
+  type       String     @default("vacation")
+  status     String     @default("pending")
+  notes      String     @default("")
+  createdAt  DateTime   @default(now())
+}
+
+// ── Support ───────────────────────────────────────────────────────────────────
 
 model SupportTicket {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // feedback | bug | support
-  type    String
-  subject String
-  body    String
-  status  String @default("open")
-
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId    String   @default("")
+  type      String
+  subject   String
+  body      String
+  status    String   @default("open")
   createdAt DateTime @default(now())
 }

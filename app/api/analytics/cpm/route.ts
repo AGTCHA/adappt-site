@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
-import { requireUserId } from "@/src/lib/auth";
+import { requireModule } from "@/src/lib/auth";
 import { handleApiError } from "@/src/lib/api";
 
 const RANGES: Record<string, number | "ytd"> = {
@@ -13,7 +13,7 @@ const RANGES: Record<string, number | "ytd"> = {
 
 export async function GET(request: Request) {
   try {
-    const userId = await requireUserId();
+    const { companyId } = await requireModule("fleet");
     const { searchParams } = new URL(request.url);
     const rangeKey = searchParams.get("range") ?? "30d";
     const range = RANGES[rangeKey] ?? 30;
@@ -23,18 +23,28 @@ export async function GET(request: Request) {
         ? new Date(new Date().getFullYear(), 0, 1)
         : new Date(Date.now() - range * 86_400_000);
 
-    const records = await prisma.maintenanceRecord.findMany({
-      where: { userId, date: { gte: since } },
-      orderBy: { date: "asc" },
-      select: {
-        truckId: true,
-        date: true,
-        amount: true,
-        category: true,
-        odometer: true,
-        truck: { select: { unitNumber: true } },
-      },
-    });
+    const [records, snapshots, trucks] = await Promise.all([
+      prisma.maintenanceRecord.findMany({
+        where: { companyId, date: { gte: since } },
+        orderBy: { date: "asc" },
+        select: {
+          truckId: true,
+          date: true,
+          amount: true,
+          category: true,
+          truck: { select: { unitNumber: true } },
+        },
+      }),
+      prisma.odometerSnapshot.findMany({
+        where: { companyId, recordedAt: { gte: since } },
+        orderBy: { recordedAt: "asc" },
+        select: { truckId: true, reading: true, recordedAt: true },
+      }),
+      prisma.truck.findMany({
+        where: { companyId },
+        select: { id: true, unitNumber: true, mileage: true },
+      }),
+    ]);
 
     let preventative = 0;
     let accident = 0;
@@ -44,30 +54,39 @@ export async function GET(request: Request) {
     }
     const total = preventative + accident;
 
-    // Miles tracked: per-truck odometer delta from invoice readings in the range
     const byTruck = new Map<
       string,
       { unitNumber: string; cost: number; minOdo: number | null; maxOdo: number | null }
     >();
-    for (const record of records) {
-      const entry = byTruck.get(record.truckId) ?? {
-        unitNumber: record.truck.unitNumber,
+
+    for (const truck of trucks) {
+      byTruck.set(truck.id, {
+        unitNumber: truck.unitNumber,
         cost: 0,
-        minOdo: null,
-        maxOdo: null,
-      };
+        minOdo: truck.mileage || null,
+        maxOdo: truck.mileage || null,
+      });
+    }
+
+    for (const snap of snapshots) {
+      const entry = byTruck.get(snap.truckId);
+      if (!entry) continue;
+      entry.minOdo =
+        entry.minOdo === null ? snap.reading : Math.min(entry.minOdo, snap.reading);
+      entry.maxOdo =
+        entry.maxOdo === null ? snap.reading : Math.max(entry.maxOdo, snap.reading);
+    }
+
+    for (const record of records) {
+      const entry = byTruck.get(record.truckId);
+      if (!entry) continue;
       entry.cost += record.amount;
-      if (record.odometer != null) {
-        entry.minOdo = entry.minOdo === null ? record.odometer : Math.min(entry.minOdo, record.odometer);
-        entry.maxOdo = entry.maxOdo === null ? record.odometer : Math.max(entry.maxOdo, record.odometer);
-      }
-      byTruck.set(record.truckId, entry);
     }
 
     let milesTracked = 0;
-    const trucks = Array.from(byTruck.entries()).map(([truckId, entry]) => {
+    const truckRows = Array.from(byTruck.entries()).map(([truckId, entry]) => {
       const miles =
-        entry.minOdo !== null && entry.maxOdo !== null
+        entry.minOdo !== null && entry.maxOdo !== null && entry.maxOdo > entry.minOdo
           ? entry.maxOdo - entry.minOdo
           : 0;
       milesTracked += miles;
@@ -77,10 +96,13 @@ export async function GET(request: Request) {
         cost: entry.cost,
         miles,
         cpm: miles > 0 ? (entry.cost / miles) * 100 : null,
+        methodology:
+          miles > 0
+            ? "Based on odometer snapshots in period"
+            : "Needs odometer readings (log maintenance with mileage or add snapshots)",
       };
     });
 
-    // Monthly buckets for the chart
     const buckets = new Map<string, { preventative: number; accident: number }>();
     for (const record of records) {
       const d = new Date(record.date);
@@ -101,9 +123,10 @@ export async function GET(request: Request) {
       accident,
       milesTracked,
       cpm: milesTracked > 0 ? (total / milesTracked) * 100 : null,
-      trucks: trucks.sort((a, b) => b.cost - a.cost),
+      trucks: truckRows.sort((a, b) => b.cost - a.cost),
       series,
       recordCount: records.length,
+      snapshotCount: snapshots.length,
     });
   } catch (error) {
     return handleApiError(error);

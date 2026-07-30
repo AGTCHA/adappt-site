@@ -5,6 +5,7 @@ import {
   isAiConfigured,
   isExtractableMimeType,
 } from "@/src/lib/openai";
+import { logDriverActivity } from "@/src/lib/recruiting";
 
 export const maxDuration = 120;
 
@@ -20,7 +21,9 @@ export async function GET(_request: Request, { params }: Params) {
       firstName: true,
       lastName: true,
       onboardingStep: true,
-      user: { select: { companyName: true } },
+      pipelineStage: true,
+      applyToken: true,
+      company: { select: { name: true } },
     },
   });
 
@@ -30,8 +33,9 @@ export async function GET(_request: Request, { params }: Params) {
 
   return NextResponse.json({
     firstName: driver.firstName,
-    companyName: driver.user.companyName,
-    completed: driver.onboardingStep >= 3,
+    companyName: driver.company.name,
+    completed: driver.onboardingStep >= 4,
+    trackToken: driver.applyToken,
   });
 }
 
@@ -41,7 +45,25 @@ export async function POST(request: Request, { params }: Params) {
 
   const driver = await prisma.driver.findUnique({
     where: { applyToken: token },
-    include: { user: { select: { id: true } } },
+    select: {
+      id: true,
+      companyId: true,
+      firstName: true,
+      lastName: true,
+      phone: true,
+      email: true,
+      city: true,
+      state: true,
+      experienceYears: true,
+      endorsements: true,
+      preferredRoute: true,
+      cdlNumber: true,
+      cdlState: true,
+      cdlExpiry: true,
+      employersJson: true,
+      onboardingStep: true,
+      pipelineStage: true,
+    },
   });
   if (!driver) {
     return NextResponse.json({ error: "This link is no longer valid." }, { status: 404 });
@@ -49,26 +71,53 @@ export async function POST(request: Request, { params }: Params) {
 
   const body = await request.json().catch(() => ({}));
 
-  // Step: application fields
-  if (body.step === "application") {
+  if (body.step === "about") {
     await prisma.driver.update({
       where: { id: driver.id },
       data: {
         phone: String(body.phone ?? driver.phone).trim(),
         email: String(body.email ?? driver.email).trim(),
+        city: String(body.city ?? driver.city).trim(),
+        state: String(body.state ?? driver.state).trim(),
         experienceYears:
           body.experienceYears != null && body.experienceYears !== ""
             ? Number(body.experienceYears) || null
             : driver.experienceYears,
-        endorsements: String(body.endorsements ?? driver.endorsements).trim(),
         preferredRoute: String(body.preferredRoute ?? driver.preferredRoute).trim(),
+        driverType: String(body.driverType ?? "").trim(),
         onboardingStep: Math.max(driver.onboardingStep, 1),
+        pipelineStage: driver.pipelineStage === "lead" ? "application" : driver.pipelineStage,
       },
     });
     return NextResponse.json({ ok: true });
   }
 
-  // Step: document upload
+  if (body.step === "license") {
+    await prisma.driver.update({
+      where: { id: driver.id },
+      data: {
+        cdlNumber: String(body.cdlNumber ?? driver.cdlNumber).trim(),
+        cdlState: String(body.cdlState ?? driver.cdlState).trim(),
+        endorsements: String(body.endorsements ?? driver.endorsements).trim(),
+        cdlExpiry: body.cdlExpiry ? new Date(body.cdlExpiry) : driver.cdlExpiry,
+        onboardingStep: Math.max(driver.onboardingStep, 2),
+      },
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.step === "employment") {
+    const employers = Array.isArray(body.employers) ? body.employers : [];
+    await prisma.driver.update({
+      where: { id: driver.id },
+      data: {
+        employersJson: JSON.stringify(employers),
+        onboardingStep: Math.max(driver.onboardingStep, 3),
+      },
+    });
+    return NextResponse.json({ ok: true });
+  }
+
   if (body.step === "document") {
     const type = ["cdl", "medcard"].includes(body.type) ? body.type : "other";
     const dataUrl = String(body.dataUrl ?? "");
@@ -94,12 +143,11 @@ export async function POST(request: Request, { params }: Params) {
         mimeType,
         data: dataUrl,
         extracted: extracted ? JSON.stringify(extracted) : "",
+        reviewStatus: extracted ? "reviewed" : "pending",
       },
     });
 
-    const updates: Record<string, unknown> = {
-      onboardingStep: Math.max(driver.onboardingStep, 2),
-    };
+    const updates: Record<string, unknown> = {};
     if (extracted && type === "cdl") {
       if (typeof extracted.cdlNumber === "string" && !driver.cdlNumber) {
         updates.cdlNumber = extracted.cdlNumber;
@@ -112,29 +160,35 @@ export async function POST(request: Request, { params }: Params) {
         if (!Number.isNaN(date.getTime())) updates.cdlExpiry = date;
       }
     }
-    if (extracted && type === "medcard" && typeof extracted.expirationDate === "string") {
-      const date = new Date(extracted.expirationDate);
-      if (!Number.isNaN(date.getTime())) updates.medCardExpiry = date;
+    if (Object.keys(updates).length > 0) {
+      await prisma.driver.update({ where: { id: driver.id }, data: updates });
     }
-    await prisma.driver.update({ where: { id: driver.id }, data: updates });
 
     return NextResponse.json({ ok: true });
   }
 
-  // Step: finish
   if (body.step === "finish") {
+    const hasDocs = await prisma.document.count({ where: { driverId: driver.id } });
     await prisma.driver.update({
       where: { id: driver.id },
-      data: { onboardingStep: 3 },
+      data: {
+        onboardingStep: 4,
+        pipelineStage: hasDocs > 0 ? "documents" : "application",
+      },
+    });
+    await logDriverActivity(prisma, {
+      driverId: driver.id,
+      body: `${driver.firstName} ${driver.lastName} submitted their application.`,
+      kind: "system",
     });
     await prisma.message.create({
       data: {
-        userId: driver.user.id,
+        companyId: driver.companyId,
         driverId: driver.id,
         direction: "inbound",
         channel: "system",
         contactName: `${driver.firstName} ${driver.lastName}`,
-        body: `${driver.firstName} ${driver.lastName} completed their onboarding application.`,
+        body: `${driver.firstName} ${driver.lastName} completed their application.`,
       },
     });
     return NextResponse.json({ ok: true });

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireUserId } from "@/src/lib/auth";
+import { requireModule } from "@/src/lib/auth";
 import { handleApiError } from "@/src/lib/api";
 import {
   extractDriverApplication,
@@ -11,7 +11,7 @@ export const maxDuration = 120;
 
 export async function POST(request: Request) {
   try {
-    await requireUserId();
+    await requireModule("recruiting");
 
     if (!isAiConfigured()) {
       return NextResponse.json(

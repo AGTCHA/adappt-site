@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/src/lib/prisma";
-import { requireUserId } from "@/src/lib/auth";
+import { requireModule } from "@/src/lib/auth";
 import { handleApiError } from "@/src/lib/api";
 
 interface ImportRow {
@@ -18,7 +18,7 @@ interface ImportRow {
 
 export async function POST(request: Request) {
   try {
-    const userId = await requireUserId();
+    const { companyId } = await requireModule("recruiting");
     const body = await request.json().catch(() => ({}));
     const rows: ImportRow[] = Array.isArray(body.rows) ? body.rows : [];
 
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
 
       await prisma.driver.create({
         data: {
-          userId,
+          companyId,
           firstName,
           lastName,
           phone: String(row.phone ?? "").trim(),

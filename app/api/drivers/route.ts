@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/src/lib/prisma";
-import { requireUserId } from "@/src/lib/auth";
+import { requireModule } from "@/src/lib/auth";
 import { handleApiError } from "@/src/lib/api";
 
 export async function GET() {
   try {
-    const userId = await requireUserId();
+    const { companyId } = await requireModule("recruiting");
     const drivers = await prisma.driver.findMany({
-      where: { userId },
+      where: { companyId },
       orderBy: { createdAt: "desc" },
       include: {
         truck: { select: { id: true, unitNumber: true } },
@@ -23,7 +23,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const userId = await requireUserId();
+    const { companyId } = await requireModule("recruiting");
     const body = await request.json().catch(() => ({}));
 
     const firstName = String(body.firstName ?? "").trim();
@@ -43,12 +43,23 @@ export async function POST(request: Request) {
 
     const driver = await prisma.driver.create({
       data: {
-        userId,
+        companyId,
         firstName,
         lastName,
         phone: String(body.phone ?? "").trim(),
         email: String(body.email ?? "").trim(),
-        status: body.status === "active" ? "active" : "onboarding",
+        pipelineStage:
+          body.status === "active"
+            ? "hired"
+            : body.status === "onboarding"
+              ? "documents"
+              : "lead",
+        status:
+          body.status === "active"
+            ? "active"
+            : body.status === "applicant"
+              ? "applicant"
+              : "onboarding",
         experienceYears:
           body.experienceYears != null && body.experienceYears !== ""
             ? Number(body.experienceYears)

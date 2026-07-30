@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
-import { requireUserId } from "@/src/lib/auth";
+import { requireModule } from "@/src/lib/auth";
 import { handleApiError } from "@/src/lib/api";
 
 export async function GET() {
   try {
-    const userId = await requireUserId();
+    const { companyId } = await requireModule("fleet");
     const trucks = await prisma.truck.findMany({
-      where: { userId },
+      where: { companyId },
       orderBy: { unitNumber: "asc" },
       include: {
         driver: { select: { id: true, firstName: true, lastName: true } },
@@ -26,7 +26,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const userId = await requireUserId();
+    const { companyId } = await requireModule("fleet");
     const body = await request.json().catch(() => ({}));
 
     const unitNumber = String(body.unitNumber ?? "").trim();
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
 
     const truck = await prisma.truck.create({
       data: {
-        userId,
+        companyId,
         unitNumber,
         year,
         make,

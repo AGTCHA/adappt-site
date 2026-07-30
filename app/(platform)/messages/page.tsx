@@ -122,6 +122,7 @@ export default function MessagesPage() {
   return (
     <div>
       <PageHeader
+        eyebrow="Recruiting"
         title="Messages"
         subtitle="Every call, text, and AI agent conversation in one timeline."
       />

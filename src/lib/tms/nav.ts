@@ -1,0 +1,20 @@
+/** Full Forge-parity TMS sidebar navigation */
+export const TMS_NAV = [
+  { href: "/tms", label: "Dashboard", icon: "LayoutDashboard" },
+  { href: "/tms/messages", label: "Mailbox", icon: "Mail" },
+  { href: "/tms/loads", label: "Loads", icon: "Package" },
+  { href: "/tms/load-board", label: "Load Board", icon: "Search" },
+  { href: "/tms/planning", label: "Planning", icon: "Calendar" },
+  { href: "/tms/dispatch", label: "Dispatch", icon: "Radio" },
+  { href: "/tms/fleet", label: "Fleet Map", icon: "Map" },
+  { href: "/tms/drivers", label: "Drivers", icon: "Users" },
+  { href: "/tms/customers", label: "Customers", icon: "Building2" },
+  { href: "/tms/invoices", label: "Invoices", icon: "FileText" },
+  { href: "/tms/settlements", label: "Settlements", icon: "Banknote" },
+  { href: "/tms/pay-rules", label: "Pay Rules", icon: "Percent" },
+  { href: "/tms/analytics", label: "Analytics", icon: "BarChart3" },
+  { href: "/tms/edi", label: "EDI", icon: "Network" },
+  { href: "/tms/highway", label: "Highway", icon: "ShieldCheck" },
+  { href: "/tms/settings", label: "TMS Settings", icon: "Settings" },
+  { href: "/tms/onboarding", label: "Onboarding", icon: "Rocket" },
+] as const;

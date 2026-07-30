@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
-import { requireUserId } from "@/src/lib/auth";
+import { requireSession } from "@/src/lib/auth";
 import { handleApiError } from "@/src/lib/api";
 
 export async function GET() {
   try {
-    const userId = await requireUserId();
+    const { companyId } = await requireSession();
 
     const monthAgo = new Date(Date.now() - 30 * 86_400_000);
     const [
@@ -14,32 +14,38 @@ export async function GET() {
       unassignedTrucks,
       newLeads,
       activeAds,
+      pipelineByStage,
       recentMessages,
       spend30d,
       recentMaintenance,
     ] = await Promise.all([
       prisma.driver.groupBy({
         by: ["status"],
-        where: { userId },
+        where: { companyId },
         _count: true,
       }),
-      prisma.truck.groupBy({ by: ["status"], where: { userId }, _count: true }),
-      prisma.truck.count({ where: { userId, driverId: null } }),
-      prisma.lead.count({ where: { userId, status: "new" } }),
-      prisma.jobAd.count({ where: { userId, status: "active" } }),
+      prisma.truck.groupBy({ by: ["status"], where: { companyId }, _count: true }),
+      prisma.truck.count({ where: { companyId, driverId: null } }),
+      prisma.lead.count({ where: { companyId, disposition: "new" } }),
+      prisma.jobAd.count({ where: { companyId, status: "active" } }),
+      prisma.driver.groupBy({
+        by: ["pipelineStage"],
+        where: { companyId, pipelineStage: { notIn: ["denied", "archived"] } },
+        _count: true,
+      }),
       prisma.message.findMany({
-        where: { userId },
+        where: { companyId },
         orderBy: { createdAt: "desc" },
         take: 6,
         include: { driver: { select: { firstName: true, lastName: true } } },
       }),
       prisma.maintenanceRecord.aggregate({
-        where: { userId, date: { gte: monthAgo } },
+        where: { companyId, date: { gte: monthAgo } },
         _sum: { amount: true },
         _count: true,
       }),
       prisma.maintenanceRecord.findMany({
-        where: { userId },
+        where: { companyId },
         orderBy: { date: "desc" },
         take: 4,
         select: {
@@ -62,11 +68,10 @@ export async function GET() {
     );
     const truckCount = truckCounts.reduce((sum, c) => sum + c._count, 0);
 
-    // Compliance alerts: expiring CDL / med cards within 30 days
     const soon = new Date(Date.now() + 30 * 86_400_000);
     const expiring = await prisma.driver.findMany({
       where: {
-        userId,
+        companyId,
         status: { in: ["active", "onboarding"] },
         OR: [
           { cdlExpiry: { lte: soon, not: null } },
@@ -93,6 +98,7 @@ export async function GET() {
       unassignedTrucks,
       newLeads,
       activeAds,
+      pipelineByStage,
       spend30d: spend30d._sum.amount ?? 0,
       spend30dCount: spend30d._count,
       recentMaintenance,

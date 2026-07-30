@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/src/lib/prisma";
-import { requireUserId } from "@/src/lib/auth";
+import { requireModule } from "@/src/lib/auth";
 import { handleApiError } from "@/src/lib/api";
 
 export async function GET() {
   try {
-    const userId = await requireUserId();
+    const { companyId } = await requireModule("recruiting");
     const jobAds = await prisma.jobAd.findMany({
-      where: { userId },
+      where: { companyId },
       orderBy: { createdAt: "desc" },
       include: { _count: { select: { leads: true } } },
     });
@@ -20,7 +20,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const userId = await requireUserId();
+    const { companyId } = await requireModule("recruiting");
     const body = await request.json().catch(() => ({}));
 
     const title = String(body.title ?? "").trim();
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
 
     const jobAd = await prisma.jobAd.create({
       data: {
-        userId,
+        companyId,
         title,
         description: String(body.description ?? "").trim(),
         payRange: String(body.payRange ?? "").trim(),

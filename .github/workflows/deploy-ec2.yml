@@ -21,7 +21,21 @@ jobs:
             cd "$APP_DIR"
             git fetch origin main
             git reset --hard origin/main
+            if command -v docker >/dev/null 2>&1; then
+              if docker compose version >/dev/null 2>&1; then
+                docker compose up -d postgres || true
+              elif ! docker ps --format '{{.Names}}' | grep -qx adapt-postgres; then
+                docker run -d --name adapt-postgres --restart unless-stopped \
+                  -e POSTGRES_USER=adapt \
+                  -e POSTGRES_PASSWORD=adapt \
+                  -e POSTGRES_DB=adapt \
+                  -p 5432:5432 \
+                  -v adapt_pg_data:/var/lib/postgresql/data \
+                  postgres:16-alpine || true
+              fi
+              sleep 3
+            fi
             npm ci
-            npm run build
+            npm run build:deploy
             pm2 reload deploy/ecosystem.config.cjs --env production || pm2 start deploy/ecosystem.config.cjs --env production
             pm2 save

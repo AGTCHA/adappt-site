@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/src/lib/prisma";
-import { requireUserId } from "@/src/lib/auth";
+import { requireModule } from "@/src/lib/auth";
 import { handleApiError } from "@/src/lib/api";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, { params }: Params) {
   try {
-    const userId = await requireUserId();
+    const { companyId } = await requireModule("recruiting");
     const { id } = await params;
 
-    const driver = await prisma.driver.findFirst({ where: { id, userId } });
+    const driver = await prisma.driver.findFirst({ where: { id, companyId } });
     if (!driver) {
       return NextResponse.json({ error: "Driver not found." }, { status: 404 });
     }
@@ -22,7 +22,6 @@ export async function POST(request: Request, { params }: Params) {
       await prisma.driver.update({ where: { id }, data: { applyToken: token } });
     }
 
-    // Prefer the actual request origin (respects nginx's forwarded headers)
     const forwardedHost = request.headers.get("x-forwarded-host");
     const forwardedProto = request.headers.get("x-forwarded-proto") ?? "https";
     const origin = forwardedHost
@@ -30,10 +29,9 @@ export async function POST(request: Request, { params }: Params) {
       : new URL(request.url).origin;
     const link = `${origin}/apply/${token}`;
 
-    // Log the outbound text in the message center
     await prisma.message.create({
       data: {
-        userId,
+        companyId,
         driverId: id,
         direction: "outbound",
         channel: "sms",

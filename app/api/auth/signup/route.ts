@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/src/lib/prisma";
-import { createSession, hashPassword } from "@/src/lib/auth";
+import { createCompanyWithOwner, createSession } from "@/src/lib/auth";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -19,18 +18,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Please fill in your name and company name." }, { status: 400 });
   }
 
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    return NextResponse.json(
-      { error: "An account with this email already exists. Try logging in instead." },
-      { status: 409 }
-    );
+  try {
+    const { user, company } = await createCompanyWithOwner({
+      email,
+      password,
+      name,
+      companyName,
+    });
+    await createSession(user.id, company.id);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "";
+    if (msg.includes("Unique constraint") || msg.includes("unique")) {
+      return NextResponse.json(
+        { error: "An account with this email already exists. Try logging in instead." },
+        { status: 409 }
+      );
+    }
+    throw error;
   }
-
-  const user = await prisma.user.create({
-    data: { email, passwordHash: await hashPassword(password), name, companyName },
-  });
-
-  await createSession(user.id);
-  return NextResponse.json({ ok: true });
 }

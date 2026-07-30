@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
-import { requireUserId } from "@/src/lib/auth";
+import { requireModule } from "@/src/lib/auth";
 import { handleApiError } from "@/src/lib/api";
 
 export async function GET(request: Request) {
   try {
-    const userId = await requireUserId();
+    const { companyId } = await requireModule("fleet");
     const { searchParams } = new URL(request.url);
     const truckId = searchParams.get("truckId");
 
     const records = await prisma.maintenanceRecord.findMany({
-      where: { userId, ...(truckId ? { truckId } : {}) },
+      where: { companyId, ...(truckId ? { truckId } : {}) },
       orderBy: { date: "desc" },
       take: 200,
       include: { truck: { select: { id: true, unitNumber: true } } },
@@ -23,13 +23,13 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const userId = await requireUserId();
+    const { companyId } = await requireModule("fleet");
     const body = await request.json().catch(() => ({}));
 
     const truckId = String(body.truckId ?? "");
     const amount = Number(body.amount);
 
-    const truck = await prisma.truck.findFirst({ where: { id: truckId, userId } });
+    const truck = await prisma.truck.findFirst({ where: { id: truckId, companyId } });
     if (!truck) {
       return NextResponse.json({ error: "Truck not found." }, { status: 404 });
     }
@@ -46,8 +46,8 @@ export async function POST(request: Request) {
 
     const record = await prisma.maintenanceRecord.create({
       data: {
+        companyId,
         truckId,
-        userId,
         date: Number.isNaN(date.getTime()) ? new Date() : date,
         vendor: String(body.vendor ?? "").trim(),
         description: String(body.description ?? "").trim(),
@@ -60,11 +60,22 @@ export async function POST(request: Request) {
       include: { truck: { select: { id: true, unitNumber: true } } },
     });
 
-    // Keep truck mileage fresh when the invoice odometer is newer
     if (record.odometer && record.odometer > truck.mileage) {
       await prisma.truck.update({
         where: { id: truckId },
         data: { mileage: record.odometer },
+      });
+    }
+
+    if (record.odometer != null && Number.isFinite(record.odometer)) {
+      await prisma.odometerSnapshot.create({
+        data: {
+          companyId,
+          truckId,
+          reading: record.odometer,
+          source: "invoice",
+          recordedAt: record.date,
+        },
       });
     }
 

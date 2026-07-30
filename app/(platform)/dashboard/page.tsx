@@ -2,278 +2,249 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
-  UserPlus,
-  Megaphone,
   ArrowRight,
-  Users,
-  Truck,
-  Inbox,
-  ShieldAlert,
-  MessageSquare,
-  Wrench,
+  BarChart3,
+  ChevronDown,
   ChevronRight,
+  ClipboardList,
+  Inbox,
+  LayoutDashboard,
+  Megaphone,
+  RefreshCw,
+  Search,
+  Shield,
+  Target,
+  UserCheck,
+  UserPlus,
+  Users,
 } from "lucide-react";
 import { PageHeader } from "@/src/components/PageHeader";
+import { IntelligenceSearchModal } from "@/src/components/recruiting/IntelligenceSearchModal";
+import { PipelineAnalyticsPanel } from "@/src/components/recruiting/PipelineAnalyticsPanel";
+import { Button } from "@/src/components/ui/Button";
 import { Card } from "@/src/components/ui/Card";
-import { StatCard } from "@/src/components/ui/StatCard";
-import { Badge } from "@/src/components/ui/Badge";
 import { Skeleton } from "@/src/components/ui/EmptyState";
 import { api } from "@/src/lib/client";
-import {
-  daysUntil,
-  formatCurrency,
-  formatDate,
-  formatRelative,
-} from "@/src/lib/format";
 
-interface DashboardData {
-  applicants: number;
-  onboarding: number;
-  activeDrivers: number;
-  trucks: number;
-  trucksInShop: number;
-  unassignedTrucks: number;
+interface OverviewData {
+  kpis: {
+    active: number;
+    review: number;
+    onboarding: number;
+    hired: number;
+    hold: number;
+  };
+  funnel: {
+    stage: string;
+    label: string;
+    shortLabel: string;
+    count: number;
+    tone: string;
+  }[];
+  funnelMax: number;
+  topSources: {
+    source: string;
+    count: number;
+    drivers: { id: string; name: string; phone: string }[];
+  }[];
   newLeads: number;
-  activeAds: number;
-  spend30d: number;
-  spend30dCount: number;
-  recentMaintenance: {
-    id: string;
-    date: string;
-    vendor: string;
-    description: string;
-    amount: number;
-    category: string;
-    truck: { id: string; unitNumber: string };
-  }[];
-  recentMessages: {
-    id: string;
-    body: string;
-    channel: string;
-    createdAt: string;
-    contactName: string;
-    driver: { firstName: string; lastName: string } | null;
-  }[];
-  expiring: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    cdlExpiry: string | null;
-    medCardExpiry: string | null;
-  }[];
 }
 
-const bigActions = [
-  {
-    href: "/drivers?new=1",
-    icon: UserPlus,
-    title: "Add New Driver",
-    body: "Scan an application or type it in — onboarding takes three steps.",
-    accent: true,
-  },
-  {
-    href: "/job-ads?new=1",
-    icon: Megaphone,
-    title: "Run Job Advertisement",
-    body: "Post a job and leads flow straight into your pipeline.",
-    accent: false,
-  },
+const toneRail: Record<string, string> = {
+  accent: "stage-rail-accent",
+  warning: "stage-rail-warning",
+  violet: "stage-rail-violet",
+  success: "stage-rail-success",
+};
+
+const KPI_META = [
+  { key: "active", label: "Active leads", icon: Users, tone: "text-accent" },
+  { key: "review", label: "In review", icon: Shield, tone: "text-violet" },
+  { key: "onboarding", label: "Onboarding", icon: UserCheck, tone: "text-warning" },
+  { key: "hired", label: "Hired", icon: UserPlus, tone: "text-success" },
+  { key: "hold", label: "On hold", icon: ClipboardList, tone: "text-ink-secondary" },
+] as const;
+
+const QUICK_LINKS = [
+  { href: "/drivers/pipeline", label: "Pipeline", icon: ClipboardList },
+  { href: "/recruiting/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/recruiting/performance", label: "Performance", icon: Target },
+  { href: "/leads", label: "Leads", icon: Inbox },
+  { href: "/job-ads", label: "Job Ads", icon: Megaphone },
 ];
 
-function expiryChip(driver: DashboardData["expiring"][number]) {
-  const items: { label: string; days: number }[] = [];
-  const cdlDays = daysUntil(driver.cdlExpiry);
-  const medDays = daysUntil(driver.medCardExpiry);
-  if (driver.cdlExpiry && cdlDays !== null && cdlDays <= 30)
-    items.push({ label: "CDL", days: cdlDays });
-  if (driver.medCardExpiry && medDays !== null && medDays <= 30)
-    items.push({ label: "Med card", days: medDays });
-  return items;
-}
-
 export default function DashboardPage() {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [data, setData] = useState<OverviewData | null>(null);
+  const [expandedSource, setExpandedSource] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    api<DashboardData>("/api/dashboard")
+  const load = useCallback(() => {
+    setLoading(true);
+    api<OverviewData>("/api/recruiting/overview")
       .then(setData)
-      .catch(() => setFailed(true));
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
   }, []);
+
+  useEffect(load, [load]);
 
   return (
     <div>
       <PageHeader
-        title="Dashboard"
-        subtitle="Everything that matters today, at a glance."
+        eyebrow="Recruiting"
+        title="Overview"
+        subtitle="Pipeline health, velocity, and hire-source performance at a glance."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" icon={<RefreshCw size={14} />} onClick={load}>
+              Refresh
+            </Button>
+            <Button variant="secondary" size="sm" icon={<Search size={14} />} onClick={() => setSearchOpen(true)}>
+              Search
+            </Button>
+            <Link href="/drivers/pipeline">
+              <Button variant="secondary" size="sm" icon={<ClipboardList size={14} />}>
+                Pipeline
+              </Button>
+            </Link>
+            <Link href="/drivers?new=1">
+              <Button size="sm" icon={<UserPlus size={14} />}>
+                New driver
+              </Button>
+            </Link>
+          </div>
+        }
       />
 
-      {/* Primary actions */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {bigActions.map((action, i) => {
-          const Icon = action.icon;
-          return (
-            <motion.div
-              key={action.href}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ type: "spring", stiffness: 240, damping: 26, delay: i * 0.07 }}
-            >
-              <Link
-                href={action.href}
-                className={`focus-ring group flex h-full items-center gap-5 rounded-3xl p-6 transition-all hover:-translate-y-1 hover:shadow-raised ${
-                  action.accent
-                    ? "bg-accent text-accent-text shadow-lg shadow-accent/25"
-                    : "glass"
-                }`}
+      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {loading || !data ? (
+          Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-[88px] rounded-2xl" />)
+        ) : (
+          KPI_META.map((card, i) => {
+            const Icon = card.icon;
+            const value = data.kpis[card.key as keyof typeof data.kpis];
+            return (
+              <motion.div
+                key={card.key}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.04 }}
               >
-                <div
-                  className={`flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl p-3.5 ${
-                    action.accent ? "bg-white/15" : "bg-accent-soft text-accent"
-                  }`}
-                >
-                  <Icon size={24} />
+                <Link href="/drivers/pipeline">
+                  <Card className="glass-raised p-4 transition-all hover:-translate-y-0.5 hover:shadow-raised">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-xs font-medium text-ink-secondary">{card.label}</span>
+                      <Icon size={15} className={card.tone} />
+                    </div>
+                    <p className="text-2xl font-bold tabular-nums tracking-tight">{value}</p>
+                  </Card>
+                </Link>
+              </motion.div>
+            );
+          })
+        )}
+      </div>
+
+      {!loading && data && (
+        <Card className="mb-5 p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold">Pipeline funnel</h2>
+              <p className="text-xs text-ink-tertiary">Drivers by stage · open kanban to manage</p>
+            </div>
+            <Link href="/drivers/pipeline" className="text-xs font-semibold text-accent hover:underline">
+              Open kanban <ArrowRight size={12} className="inline" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            {data.funnel.map((stage, index) => {
+              const pct = data.funnelMax > 0 ? (stage.count / data.funnelMax) * 100 : 0;
+              return (
+                <div key={stage.stage} className="relative min-w-0">
+                  {index > 0 && (
+                    <ChevronRight className="absolute -left-2 top-1/2 hidden -translate-y-1/2 text-ink-tertiary lg:block" size={14} />
+                  )}
+                  <div className={`rounded-xl border border-border/80 px-3 py-2.5 ${toneRail[stage.tone] ?? ""}`}>
+                    <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-ink-secondary">
+                      {stage.shortLabel}
+                    </p>
+                    <p className="mt-0.5 text-xl font-bold tabular-nums">{stage.count}</p>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-border/50">
+                      <div
+                        className="h-full rounded-full bg-accent transition-all"
+                        style={{ width: `${Math.max(pct, stage.count > 0 ? 12 : 0)}%` }}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-lg font-semibold tracking-tight">{action.title}</h2>
-                  <p
-                    className={`mt-0.5 text-sm leading-relaxed ${
-                      action.accent ? "opacity-85" : "text-ink-secondary"
-                    }`}
-                  >
-                    {action.body}
-                  </p>
-                </div>
-                <ArrowRight
-                  size={18}
-                  className={`shrink-0 transition-transform group-hover:translate-x-1 ${
-                    action.accent ? "" : "text-accent"
-                  }`}
-                />
-              </Link>
-            </motion.div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
+      <div className="mb-5 flex flex-wrap gap-2">
+        <span className="self-center text-xs font-medium text-ink-tertiary">Jump to</span>
+        {QUICK_LINKS.map((link) => {
+          const Icon = link.icon;
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="focus-ring inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-solid px-3.5 py-1.5 text-xs font-semibold text-ink-secondary transition hover:border-accent hover:text-accent"
+            >
+              <Icon size={13} />
+              {link.label}
+            </Link>
           );
         })}
       </div>
 
-      {/* KPI row */}
-      <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {data ? (
-          <>
-            <StatCard
-              label="Active drivers"
-              value={data.activeDrivers}
-              sub={
-                data.onboarding + data.applicants > 0
-                  ? `+${data.onboarding + data.applicants} in pipeline`
-                  : "pipeline empty"
-              }
-              icon={<Users size={17} />}
-              tone="accent"
-              delay={0.1}
-              onClick={() => (window.location.href = "/drivers")}
-            />
-            <StatCard
-              label="Fleet"
-              value={data.trucks}
-              sub={
-                data.trucksInShop > 0
-                  ? `${data.trucksInShop} in the shop`
-                  : data.unassignedTrucks > 0
-                    ? `${data.unassignedTrucks} unassigned`
-                    : "all rolling"
-              }
-              icon={<Truck size={17} />}
-              tone={data.trucksInShop > 0 ? "warning" : "success"}
-              delay={0.15}
-              onClick={() => (window.location.href = "/fleet")}
-            />
-            <StatCard
-              label="Maintenance · 30d"
-              value={formatCurrency(data.spend30d)}
-              sub={`${data.spend30dCount} invoice${data.spend30dCount === 1 ? "" : "s"}`}
-              icon={<Wrench size={17} />}
-              tone="default"
-              delay={0.2}
-              onClick={() => (window.location.href = "/fleet?tab=analytics")}
-            />
-            <StatCard
-              label="New leads"
-              value={data.newLeads}
-              sub={`${data.activeAds} active ad${data.activeAds === 1 ? "" : "s"}`}
-              icon={<Inbox size={17} />}
-              tone={data.newLeads > 0 ? "accent" : "default"}
-              delay={0.25}
-              onClick={() => (window.location.href = "/job-ads")}
-            />
-          </>
-        ) : (
-          Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-[74px] rounded-2xl" />
-          ))
-        )}
-      </div>
-
-      {failed && (
-        <p className="mt-6 text-sm text-danger">
-          Couldn&apos;t load your dashboard. Refresh the page to try again.
-        </p>
-      )}
-
-      {/* Three-column detail row */}
-      <div className="mt-5 grid gap-4 lg:grid-cols-3">
-        {/* Compliance alerts */}
-        <Card delay={0.25} className="flex flex-col p-5">
+      <div className="mb-6 grid gap-4 lg:grid-cols-2">
+        <Card className="p-5">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ShieldAlert size={15} className="text-warning" />
-              <h3 className="text-sm font-semibold">Compliance · 30 days</h3>
+            <div>
+              <h3 className="text-sm font-semibold">Top hire sources</h3>
+              <p className="text-xs text-ink-tertiary">Attributed hires · expand to see drivers</p>
             </div>
-            <Link
-              href="/drivers"
-              className="focus-ring rounded text-xs font-medium text-accent hover:underline"
-            >
-              All drivers
+            <Link href="/recruiting/hire-sources" className="text-xs font-semibold text-accent hover:underline">
+              Manage
             </Link>
           </div>
-          {!data ? (
-            <Skeleton className="h-24" />
-          ) : data.expiring.length === 0 ? (
-            <p className="text-sm text-ink-secondary">
-              All CDLs and med cards are current. Nothing expiring soon.
-            </p>
+          {!data || data.topSources.length === 0 ? (
+            <p className="py-8 text-center text-sm text-ink-tertiary">No hires with sources yet.</p>
           ) : (
-            <ul className="-mx-2 space-y-0.5">
-              {data.expiring.map((driver) => {
-                const chips = expiryChip(driver);
+            <ul className="space-y-1">
+              {data.topSources.map((source) => {
+                const open = expandedSource === source.source;
                 return (
-                  <li key={driver.id}>
-                    <Link
-                      href={`/drivers/${driver.id}`}
-                      className="focus-ring flex items-center justify-between gap-2 rounded-xl px-2 py-2 transition-colors hover:bg-warning-soft"
+                  <li key={source.source} className="rounded-xl border border-border/70">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedSource(open ? null : source.source)}
+                      className="flex w-full items-center justify-between px-3 py-2.5 text-left"
                     >
-                      <span className="min-w-0 truncate text-sm font-medium">
-                        {driver.firstName} {driver.lastName}
-                      </span>
-                      <span className="flex shrink-0 gap-1">
-                        {chips.map((chip) => (
-                          <Badge
-                            key={chip.label}
-                            tone={chip.days < 0 ? "danger" : "warning"}
-                          >
-                            {chip.label}{" "}
-                            {chip.days < 0 ? "expired" : `${chip.days}d`}
-                          </Badge>
+                      <div>
+                        <p className="text-sm font-semibold">{source.source}</p>
+                        <p className="text-xs text-ink-tertiary">{source.count} hired</p>
+                      </div>
+                      <ChevronDown size={16} className={`transition ${open ? "rotate-180" : ""}`} />
+                    </button>
+                    {open && (
+                      <ul className="border-t border-border/60 px-3 py-2">
+                        {source.drivers.map((d) => (
+                          <li key={d.id}>
+                            <Link href={`/drivers/${d.id}`} className="block py-1.5 text-sm hover:text-accent">
+                              {d.name}
+                              {d.phone ? <span className="text-ink-tertiary"> · {d.phone}</span> : null}
+                            </Link>
+                          </li>
                         ))}
-                        {chips.length === 0 && (
-                          <span className="text-xs text-warning">
-                            {driver.cdlExpiry && `CDL ${formatDate(driver.cdlExpiry)}`}
-                          </span>
-                        )}
-                      </span>
-                    </Link>
+                      </ul>
+                    )}
                   </li>
                 );
               })}
@@ -281,129 +252,29 @@ export default function DashboardPage() {
           )}
         </Card>
 
-        {/* Latest maintenance */}
-        <Card delay={0.3} className="flex flex-col p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Wrench size={15} className="text-accent" />
-              <h3 className="text-sm font-semibold">Latest maintenance</h3>
+        <Card className="flex flex-col justify-center p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent-soft text-accent">
+              <LayoutDashboard size={20} />
             </div>
-            <Link
-              href="/fleet?tab=maintenance"
-              className="focus-ring rounded text-xs font-medium text-accent hover:underline"
-            >
-              View all
-            </Link>
-          </div>
-          {!data ? (
-            <Skeleton className="h-24" />
-          ) : data.recentMaintenance.length === 0 ? (
-            <p className="text-sm text-ink-secondary">
-              No maintenance logged yet. Drop an invoice in the Fleet section and
-              AI does the typing.
-            </p>
-          ) : (
-            <ul className="space-y-2.5">
-              {data.recentMaintenance.map((record) => (
-                <li key={record.id} className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm">
-                      <span className="font-medium">Unit {record.truck.unitNumber}</span>
-                      <span className="text-ink-secondary">
-                        {" "}
-                        · {record.description || record.vendor || "Service"}
-                      </span>
-                    </p>
-                    <p className="mt-0.5 text-xs text-ink-tertiary">
-                      {formatDate(record.date)}
-                      {record.vendor && ` · ${record.vendor}`}
-                    </p>
-                  </div>
-                  <span
-                    className={`shrink-0 text-sm font-semibold ${
-                      record.category === "accident" ? "text-danger" : ""
-                    }`}
-                  >
-                    {formatCurrency(record.amount)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-
-        {/* Recent activity */}
-        <Card delay={0.35} className="flex flex-col p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <MessageSquare size={15} className="text-accent" />
-              <h3 className="text-sm font-semibold">Recent activity</h3>
+            <div>
+              <h3 className="text-sm font-semibold">New leads waiting</h3>
+              <p className="mt-1 text-3xl font-bold tabular-nums">{data?.newLeads ?? "—"}</p>
+              <Link href="/leads" className="mt-2 inline-flex text-xs font-semibold text-accent hover:underline">
+                Work leads <ArrowRight size={12} className="inline" />
+              </Link>
             </div>
-            <Link
-              href="/messages"
-              className="focus-ring rounded text-xs font-medium text-accent hover:underline"
-            >
-              All messages
-            </Link>
           </div>
-          {!data ? (
-            <Skeleton className="h-24" />
-          ) : data.recentMessages.length === 0 ? (
-            <p className="text-sm text-ink-secondary">
-              No activity yet. It&apos;ll show up here as you add drivers and run ads.
-            </p>
-          ) : (
-            <ul className="space-y-2.5">
-              {data.recentMessages.map((message) => (
-                <li key={message.id} className="flex items-start justify-between gap-3">
-                  <p className="min-w-0 text-sm leading-snug text-ink-secondary">
-                    <span className="font-medium text-ink">
-                      {message.driver
-                        ? `${message.driver.firstName} ${message.driver.lastName}`
-                        : message.contactName || "System"}
-                    </span>{" "}
-                    <span className="line-clamp-1">{message.body}</span>
-                  </p>
-                  <span className="shrink-0 text-xs text-ink-tertiary">
-                    {formatRelative(message.createdAt)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
         </Card>
       </div>
 
-      {/* Quick link strip */}
-      {data && (data.trucksInShop > 0 || data.unassignedTrucks > 0) && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="mt-4 flex flex-wrap gap-2"
-        >
-          {data.trucksInShop > 0 && (
-            <Link
-              href="/fleet"
-              className="glass focus-ring flex items-center gap-2 rounded-full px-4 py-2 text-xs font-medium text-warning transition-all hover:-translate-y-0.5"
-            >
-              <Wrench size={12} />
-              {data.trucksInShop} truck{data.trucksInShop === 1 ? "" : "s"} in the shop
-              <ChevronRight size={12} />
-            </Link>
-          )}
-          {data.unassignedTrucks > 0 && (
-            <Link
-              href="/fleet"
-              className="glass focus-ring flex items-center gap-2 rounded-full px-4 py-2 text-xs font-medium text-ink-secondary transition-all hover:-translate-y-0.5"
-            >
-              <Truck size={12} />
-              {data.unassignedTrucks} truck{data.unassignedTrucks === 1 ? "" : "s"} without a driver
-              <ChevronRight size={12} />
-            </Link>
-          )}
-        </motion.div>
-      )}
+      <div className="mb-2 flex items-center gap-2">
+        <BarChart3 size={16} />
+        <h2 className="text-base font-semibold">Pipeline analytics</h2>
+      </div>
+      <PipelineAnalyticsPanel embedded />
+
+      <IntelligenceSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   );
 }

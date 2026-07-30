@@ -1,25 +1,26 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
-import { requireUserId } from "@/src/lib/auth";
+import { requireModule } from "@/src/lib/auth";
 import { handleApiError } from "@/src/lib/api";
 import {
   extractDriverDocument,
   isAiConfigured,
   isExtractableMimeType,
 } from "@/src/lib/openai";
+import { dataUrlToBuffer, storeUpload } from "@/src/lib/storage";
 
 export const maxDuration = 120;
 
 type Params = { params: Promise<{ id: string }> };
 
-const MAX_DATAURL_LENGTH = 20_000_000; // ~14MB file as base64
+const MAX_DATAURL_LENGTH = 20_000_000;
 
 export async function POST(request: Request, { params }: Params) {
   try {
-    const userId = await requireUserId();
+    const { companyId } = await requireModule("recruiting");
     const { id } = await params;
 
-    const driver = await prisma.driver.findFirst({ where: { id, userId } });
+    const driver = await prisma.driver.findFirst({ where: { id, companyId } });
     if (!driver) {
       return NextResponse.json({ error: "Driver not found." }, { status: 404 });
     }
@@ -42,7 +43,6 @@ export async function POST(request: Request, { params }: Params) {
       );
     }
 
-    // AI extraction (applications are extracted client-side before upload)
     let extracted: Record<string, unknown> | null = null;
     if (
       isAiConfigured() &&
@@ -55,19 +55,30 @@ export async function POST(request: Request, { params }: Params) {
       extracted = body.extracted as Record<string, unknown>;
     }
 
+    let storageKey = "";
+    let inlineData = dataUrl;
+    try {
+      const { buffer, mimeType: parsedMime } = dataUrlToBuffer(dataUrl);
+      const stored = await storeUpload(companyId, fileName, parsedMime || mimeType, buffer);
+      storageKey = stored.key;
+      inlineData = "";
+    } catch (storageError) {
+      console.warn("Object storage unavailable, keeping inline document:", storageError);
+    }
+
     const document = await prisma.document.create({
       data: {
         driverId: id,
         type,
         fileName,
         mimeType,
-        data: dataUrl,
+        storageKey,
+        data: inlineData,
         extracted: extracted ? JSON.stringify(extracted) : "",
       },
       select: { id: true, type: true, fileName: true, extracted: true, createdAt: true },
     });
 
-    // Auto-fill compliance fields from extraction
     const updates: Record<string, unknown> = {};
     if (extracted) {
       if (type === "cdl") {
@@ -91,7 +102,6 @@ export async function POST(request: Request, { params }: Params) {
       }
     }
 
-    // Advance onboarding to step 2 once documents exist
     if (driver.onboardingStep < 2 && type !== "application") {
       updates.onboardingStep = 2;
     }

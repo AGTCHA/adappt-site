@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
-import { requireUserId } from "@/src/lib/auth";
+import { requireModule } from "@/src/lib/auth";
 import { handleApiError } from "@/src/lib/api";
 
 export async function GET(request: Request) {
   try {
-    const userId = await requireUserId();
+    const { companyId } = await requireModule("recruiting");
     const { searchParams } = new URL(request.url);
     const channel = searchParams.get("channel");
 
     const messages = await prisma.message.findMany({
-      where: { userId, ...(channel && channel !== "all" ? { channel } : {}) },
+      where: { companyId, ...(channel && channel !== "all" ? { channel } : {}) },
       orderBy: { createdAt: "desc" },
       take: 200,
       include: {
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const userId = await requireUserId();
+    const { companyId } = await requireModule("recruiting");
     const body = await request.json().catch(() => ({}));
 
     const text = String(body.body ?? "").trim();
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
 
     const message = await prisma.message.create({
       data: {
-        userId,
+        companyId,
         driverId: typeof body.driverId === "string" ? body.driverId : null,
         direction: body.direction === "inbound" ? "inbound" : "outbound",
         channel: ["sms", "call", "ai_call", "email", "system"].includes(body.channel)

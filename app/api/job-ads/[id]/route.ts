@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
-import { requireUserId } from "@/src/lib/auth";
+import { requireModule } from "@/src/lib/auth";
 import { handleApiError } from "@/src/lib/api";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: Request, { params }: Params) {
   try {
-    const userId = await requireUserId();
+    const { companyId } = await requireModule("recruiting");
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
 
-    const existing = await prisma.jobAd.findFirst({ where: { id, userId } });
+    const existing = await prisma.jobAd.findFirst({ where: { id, companyId } });
     if (!existing) {
       return NextResponse.json({ error: "Job ad not found." }, { status: 404 });
     }
@@ -37,10 +37,10 @@ export async function PATCH(request: Request, { params }: Params) {
 
 export async function DELETE(_request: Request, { params }: Params) {
   try {
-    const userId = await requireUserId();
+    const { companyId } = await requireModule("recruiting");
     const { id } = await params;
 
-    const existing = await prisma.jobAd.findFirst({ where: { id, userId } });
+    const existing = await prisma.jobAd.findFirst({ where: { id, companyId } });
     if (!existing) {
       return NextResponse.json({ error: "Job ad not found." }, { status: 404 });
     }

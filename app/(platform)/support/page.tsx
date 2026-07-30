@@ -73,6 +73,7 @@ export default function SupportPage() {
   return (
     <div>
       <PageHeader
+        eyebrow="Help"
         title="Support"
         subtitle="We're here to help — usually within a business day."
       />

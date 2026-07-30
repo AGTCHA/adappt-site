@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/src/components/AppShell";
 import { getSessionUser } from "@/src/lib/auth";
+import { DEFAULT_ENABLED_MODULES, type ModuleId } from "@/src/lib/modules";
 
 export default async function PlatformLayout({
   children,
@@ -12,5 +13,18 @@ export default async function PlatformLayout({
     redirect("/login");
   }
 
-  return <AppShell user={user}>{children}</AppShell>;
+  return (
+    <AppShell
+      user={{
+        name: user.name,
+        companyName: user.companyName,
+        enabledModules: (user.enabledModules?.length
+          ? user.enabledModules
+          : DEFAULT_ENABLED_MODULES) as ModuleId[],
+        role: user.role ?? "viewer",
+      }}
+    >
+      {children}
+    </AppShell>
+  );
 }

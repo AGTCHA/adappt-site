@@ -63,6 +63,7 @@ const pipelineColumns = [
     icon: Inbox,
     hint: "Fresh from your ads — reach out fast.",
     tone: "text-accent",
+    rail: "stage-rail-accent",
   },
   {
     key: "contacted",
@@ -70,6 +71,7 @@ const pipelineColumns = [
     icon: PhoneCall,
     hint: "You've reached out — waiting to hear back.",
     tone: "text-warning",
+    rail: "stage-rail-warning",
   },
   {
     key: "converted",
@@ -77,6 +79,7 @@ const pipelineColumns = [
     icon: CheckCircle2,
     hint: "In your pipeline as applicants.",
     tone: "text-success",
+    rail: "stage-rail-success",
   },
 ] as const;
 
@@ -179,6 +182,7 @@ function JobAdsContent() {
   return (
     <div>
       <PageHeader
+        eyebrow="Recruiting"
         title="Job Ads"
         subtitle="Post openings and catch every applicant automatically."
         actions={
@@ -300,7 +304,12 @@ function JobAdsContent() {
 
       {/* Lead pipeline board */}
       <div className="mt-10">
-        <h2 className="mb-4 text-lg font-semibold tracking-tight">Lead pipeline</h2>
+        <div className="mb-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent">
+            Applicants
+          </p>
+          <h2 className="mt-1 text-lg font-semibold tracking-tight text-ink">Lead pipeline</h2>
+        </div>
         {leads === null ? (
           <div className="grid gap-4 lg:grid-cols-3">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -326,12 +335,12 @@ function JobAdsContent() {
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ type: "spring", stiffness: 260, damping: 26, delay: ci * 0.06 }}
-                  className="rounded-2xl border border-border bg-surface/50 p-3 backdrop-blur"
+                  className={`glass overflow-hidden rounded-2xl p-3 ${column.rail}`}
                 >
                   <div className="mb-3 flex items-center gap-2 px-1.5">
                     <Icon size={14} className={column.tone} />
-                    <h3 className="text-sm font-semibold">{column.label}</h3>
-                    <span className="ml-auto rounded-full bg-border/60 px-2 py-0.5 text-[11px] font-semibold text-ink-secondary">
+                    <h3 className="text-sm font-semibold text-ink">{column.label}</h3>
+                    <span className="ml-auto rounded-full bg-surface-solid px-2 py-0.5 text-[11px] font-semibold text-ink-secondary shadow-sm">
                       {columnLeads.length}
                     </span>
                   </div>
