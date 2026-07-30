@@ -5,7 +5,7 @@ import { handleApiError } from "@/src/lib/api";
 
 function startOfWeek(iso: string | null): Date {
   const d = iso ? new Date(iso) : new Date();
-  if (isNaN(d.getTime())) return startOfWeek(null);
+  if (Number.isNaN(d.getTime())) return startOfWeek(null);
   const day = d.getDay();
   const diff = day === 0 ? -6 : 1 - day;
   d.setHours(0, 0, 0, 0);
@@ -33,6 +33,7 @@ export async function GET(request: Request) {
         lastName: true,
         phone: true,
         status: true,
+        dispatcherName: true,
       },
       orderBy: { lastName: "asc" },
     });
@@ -50,11 +51,17 @@ export async function GET(request: Request) {
           },
         ],
       },
-      include: {
-        truck: { select: { id: true, unitNumber: true } },
-        trailer: { select: { id: true, name: true, trailerNumber: true } },
-        customer: { select: { id: true, name: true } },
-        stops: { orderBy: { sequence: "asc" } },
+      select: {
+        id: true,
+        loadNumber: true,
+        status: true,
+        origin: true,
+        destination: true,
+        pickupDate: true,
+        deliveryDate: true,
+        driverId: true,
+        customerName: true,
+        totalRevenue: true,
       },
       orderBy: { pickupDate: "asc" },
     });
@@ -67,8 +74,14 @@ export async function GET(request: Request) {
       loadsByDriver.set(load.driverId, arr);
     }
 
+    // Flat shape expected by the planning UI
     const result = drivers.map((driver) => ({
-      driver,
+      id: driver.id,
+      firstName: driver.firstName ?? "",
+      lastName: driver.lastName ?? "",
+      phone: driver.phone ?? "",
+      status: driver.status,
+      dispatcher: driver.dispatcherName || null,
       loads: loadsByDriver.get(driver.id) ?? [],
     }));
 

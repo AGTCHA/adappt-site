@@ -353,7 +353,7 @@ export function CreateLoadModal({ open, onClose, onCreated, initialValues }: Cre
                     >
                       {STOP_TYPES.map((st) => (
                         <option key={st} value={st}>
-                          {st.charAt(0).toUpperCase() + st.slice(1)}
+                          {(st ?? "").charAt(0).toUpperCase() + (st ?? "").slice(1)}
                         </option>
                       ))}
                     </Select>

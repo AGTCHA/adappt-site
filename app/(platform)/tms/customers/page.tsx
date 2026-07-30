@@ -332,7 +332,11 @@ export default function CustomersPage() {
                     : "No limit"}
                 </Badge>
                 <p className="text-sm text-ink-secondary">
-                  {c.paymentTerms?.replace("_", " ") ?? "—"}
+                  {typeof c.paymentTerms === "number"
+                    ? `Net ${c.paymentTerms}`
+                    : typeof c.paymentTerms === "string"
+                      ? c.paymentTerms.replaceAll("_", " ")
+                      : "—"}
                 </p>
                 <Badge tone={statusTone[c.status] ?? "neutral"}>
                   {c.status}

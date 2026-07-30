@@ -64,8 +64,24 @@ export async function GET() {
       summary[b].total += inv.balance;
     }
 
+    // Flat totals for StatCards that expect numbers, plus nested summary
+    const aging = {
+      current: summary.current?.total ?? 0,
+      "1_30": summary["1_30"]?.total ?? 0,
+      "31_60": summary["31_60"]?.total ?? 0,
+      "61_90": summary["61_90"]?.total ?? 0,
+      "90_plus": summary["90_plus"]?.total ?? 0,
+    };
+
     return NextResponse.json({
       summary,
+      aging,
+      current: aging.current,
+      "1_30": aging["1_30"],
+      "31_60": aging["31_60"],
+      "61_90": aging["61_90"],
+      "90_plus": aging["90_plus"],
+      total: refreshed.reduce((s, inv) => s + inv.balance, 0),
       totalOutstanding: refreshed.reduce((s, inv) => s + inv.balance, 0),
       invoiceCount: refreshed.length,
       updated: updates.length,

@@ -3,6 +3,7 @@ import { prisma } from "@/src/lib/prisma";
 import { requireModule } from "@/src/lib/auth";
 import { handleApiError } from "@/src/lib/api";
 import { agingBucketFor, INVOICE_STATUSES } from "@/src/lib/tms/constants";
+import { shapeInvoice } from "@/src/lib/tms/invoice-shape";
 import { parseDate } from "@/src/lib/tms/parse";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -38,7 +39,7 @@ export async function GET(_request: Request, ctx: Ctx) {
       return NextResponse.json({ error: "Invoice not found." }, { status: 404 });
     }
 
-    return NextResponse.json({ invoice });
+    return NextResponse.json({ invoice: shapeInvoice(invoice) });
   } catch (error) {
     return handleApiError(error);
   }
@@ -72,7 +73,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
         },
         include: invoiceInclude,
       });
-      return NextResponse.json({ invoice });
+      return NextResponse.json({ invoice: shapeInvoice(invoice) });
     }
 
     if (body.action === "mark_sent") {
@@ -81,7 +82,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
         data: { sentAt: new Date() },
         include: invoiceInclude,
       });
-      return NextResponse.json({ invoice });
+      return NextResponse.json({ invoice: shapeInvoice(invoice) });
     }
 
     if (body.action === "record_payment") {
@@ -143,7 +144,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
         return inv;
       });
 
-      return NextResponse.json({ invoice });
+      return NextResponse.json({ invoice: shapeInvoice(invoice) });
     }
 
     if (body.action === "void") {
@@ -179,7 +180,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
         return inv;
       });
 
-      return NextResponse.json({ invoice });
+      return NextResponse.json({ invoice: shapeInvoice(invoice) });
     }
 
     const data: Record<string, unknown> = {};
@@ -206,7 +207,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
       include: invoiceInclude,
     });
 
-    return NextResponse.json({ invoice });
+    return NextResponse.json({ invoice: shapeInvoice(invoice) });
   } catch (error) {
     return handleApiError(error);
   }

@@ -113,9 +113,11 @@ export default function FleetPage() {
     const q = search.toLowerCase();
     return trucks.filter(
       (t) =>
-        t.unitNumber.toLowerCase().includes(q) ||
+        (t.unitNumber ?? "").toLowerCase().includes(q) ||
         (t.assignedDriver
-          ? `${t.assignedDriver.firstName} ${t.assignedDriver.lastName}`.toLowerCase().includes(q)
+          ? `${t.assignedDriver.firstName ?? ""} ${t.assignedDriver.lastName ?? ""}`
+              .toLowerCase()
+              .includes(q)
           : false)
     );
   }, [trucks, search]);
@@ -412,7 +414,7 @@ export default function FleetPage() {
                     )}
                   </div>
                   <p className="text-sm text-ink-secondary capitalize">
-                    {trailer.type.replace(/_/g, " ")}
+                    {(trailer.type ?? "dry_van").replace(/_/g, " ")}
                   </p>
                   <p className="text-sm text-ink-secondary">
                     {trailer.length ? `${trailer.length}ft` : "—"}

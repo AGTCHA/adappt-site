@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     }
     if (driverId) where.driverId = driverId;
 
-    const settlements = await prisma.tmsSettlement.findMany({
+    const rows = await prisma.tmsSettlement.findMany({
       where,
       orderBy: { createdAt: "desc" },
       take: 200,
@@ -30,6 +30,16 @@ export async function GET(request: Request) {
         _count: { select: { lines: true, adjustments: true } },
       },
     });
+
+    const settlements = rows.map((s) => ({
+      ...s,
+      driverName: [s.driver?.firstName, s.driver?.lastName]
+        .filter(Boolean)
+        .join(" ")
+        .trim(),
+      totalDeductions: s.deductions,
+      lineCount: s._count.lines,
+    }));
 
     return NextResponse.json({ settlements });
   } catch (error) {

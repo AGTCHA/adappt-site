@@ -13,14 +13,32 @@ export async function GET(request: Request) {
     const where: Record<string, unknown> = { companyId };
     if (driverId) where.driverId = driverId;
 
-    const accounts = await prisma.tmsEscrowAccount.findMany({
+    const rows = await prisma.tmsEscrowAccount.findMany({
       where,
       orderBy: { createdAt: "desc" },
       include: {
         driver: { select: { id: true, firstName: true, lastName: true } },
-        transactions: { orderBy: { createdAt: "desc" as const }, take: 10 },
+        transactions: { orderBy: { createdAt: "desc" as const }, take: 50 },
         _count: { select: { recurringItems: true, transactions: true } },
       },
+    });
+
+    const accounts = rows.map((a) => {
+      const deposited = a.transactions
+        .filter((t) => t.amount > 0)
+        .reduce((s, t) => s + t.amount, 0);
+      const withdrawn = a.transactions
+        .filter((t) => t.amount < 0)
+        .reduce((s, t) => s + Math.abs(t.amount), 0);
+      return {
+        ...a,
+        driverName: [a.driver?.firstName, a.driver?.lastName]
+          .filter(Boolean)
+          .join(" ")
+          .trim(),
+        totalDeposited: deposited,
+        totalWithdrawn: withdrawn,
+      };
     });
 
     return NextResponse.json({ accounts });

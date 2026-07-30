@@ -286,7 +286,8 @@ function SettlementsTab({
               <span className="text-sm text-danger">{formatCurrency(s.totalDeductions)}</span>
               <span className="text-sm font-semibold text-success">{formatCurrency(s.netPay)}</span>
               <Badge tone={settlementTone[s.status] ?? "neutral"}>
-                {s.status.charAt(0).toUpperCase() + s.status.slice(1)}
+                {(s.status ?? "draft").charAt(0).toUpperCase() +
+                  (s.status ?? "draft").slice(1)}
               </Badge>
             </motion.div>
           ))}
@@ -580,7 +581,9 @@ function DeductionsTab({
                   <Badge tone={r.type === "deduction" ? "danger" : "success"}>{r.type}</Badge>
                   <p className="text-sm text-ink-secondary">{r.description}</p>
                   <span className="text-sm font-semibold">{formatCurrency(r.amount, 2)}</span>
-                  <span className="text-xs text-ink-tertiary">{r.frequency.replace("_", " ")}</span>
+                  <span className="text-xs text-ink-tertiary">
+                    {(r.frequency ?? "per_settlement").replaceAll("_", " ")}
+                  </span>
                   <Badge tone={r.active ? "success" : "neutral"}>{r.active ? "Active" : "Inactive"}</Badge>
                 </motion.div>
               ))}

@@ -54,11 +54,44 @@ export async function GET(request: Request) {
       ];
     }
 
-    const loads = await prisma.tmsLoad.findMany({
+    const rows = await prisma.tmsLoad.findMany({
       where,
       orderBy: { createdAt: "desc" },
       take: 500,
       include: loadInclude,
+    });
+
+    const splitLane = (value: string | null | undefined) => {
+      const parts = String(value ?? "")
+        .split(",")
+        .map((p) => p.trim())
+        .filter(Boolean);
+      if (parts.length === 0) return { city: "", state: "" };
+      if (parts.length === 1) return { city: parts[0], state: "" };
+      return { city: parts.slice(0, -1).join(", "), state: parts[parts.length - 1] };
+    };
+
+    const loads = rows.map((load) => {
+      const origin = splitLane(load.origin);
+      const dest = splitLane(load.destination);
+      return {
+        ...load,
+        originCity: origin.city,
+        originState: origin.state,
+        destCity: dest.city,
+        destState: dest.state,
+        rate: load.rate ?? load.totalRevenue ?? 0,
+        miles: load.miles ?? load.totalMiles ?? load.loadedMiles ?? 0,
+        driverName: load.driver
+          ? `${load.driver.firstName ?? ""} ${load.driver.lastName ?? ""}`.trim()
+          : "",
+        trailer: load.trailer
+          ? {
+              ...load.trailer,
+              unitNumber: load.trailer.trailerNumber || load.trailer.name,
+            }
+          : null,
+      };
     });
 
     return NextResponse.json({ loads });

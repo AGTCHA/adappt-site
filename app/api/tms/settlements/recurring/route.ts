@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     if (active === "true") where.isActive = true;
     if (active === "false") where.isActive = false;
 
-    const items = await prisma.tmsRecurringItem.findMany({
+    const rows = await prisma.tmsRecurringItem.findMany({
       where,
       orderBy: { createdAt: "desc" },
       include: {
@@ -24,6 +24,17 @@ export async function GET(request: Request) {
         escrowAccount: { select: { id: true, name: true, balance: true } },
       },
     });
+
+    const items = rows.map((r) => ({
+      ...r,
+      driverName: [r.driver?.firstName, r.driver?.lastName]
+        .filter(Boolean)
+        .join(" ")
+        .trim(),
+      type: r.kind,
+      frequency: "per_settlement",
+      active: r.isActive,
+    }));
 
     return NextResponse.json({ items });
   } catch (error) {

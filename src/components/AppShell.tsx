@@ -359,7 +359,7 @@ function SidebarContent({
       <div className="mt-4 flex items-center justify-between gap-2 border-t border-border pt-4">
         <div className="flex min-w-0 items-center gap-2.5">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-semibold text-accent">
-            {user.name.charAt(0).toUpperCase()}
+            {(user.name ?? "?").charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0">
             <p className="truncate text-xs font-medium text-ink-secondary">{user.name}</p>

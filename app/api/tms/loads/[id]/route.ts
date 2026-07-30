@@ -39,13 +39,26 @@ export async function GET(_request: Request, ctx: Ctx) {
   try {
     const { companyId } = await requireModule("tms");
     const { id } = await ctx.params;
-    const load = await prisma.tmsLoad.findFirst({
+    const row = await prisma.tmsLoad.findFirst({
       where: { id, companyId },
       include: loadInclude,
     });
-    if (!load) {
+    if (!row) {
       return NextResponse.json({ error: "Load not found." }, { status: 404 });
     }
+
+    const load = {
+      ...row,
+      trailer: row.trailer
+        ? {
+            ...row.trailer,
+            unitNumber: row.trailer.trailerNumber || row.trailer.name,
+          }
+        : null,
+      rate: row.rate ?? row.totalRevenue ?? 0,
+      miles: row.miles ?? row.totalMiles ?? row.loadedMiles ?? 0,
+    };
+
     return NextResponse.json({ load });
   } catch (error) {
     return handleApiError(error);

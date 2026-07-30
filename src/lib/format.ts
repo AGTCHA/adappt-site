@@ -35,8 +35,14 @@ export function formatRelative(value: string | Date) {
   return formatDate(date);
 }
 
-export function initials(first: string, last: string) {
-  return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase();
+export function initials(
+  first?: string | null,
+  last?: string | null,
+) {
+  const a = (first ?? "").trim().charAt(0);
+  const b = (last ?? "").trim().charAt(0);
+  const out = `${a}${b}`.toUpperCase();
+  return out || "?";
 }
 
 /** Days until a date; negative if past. Null when no date. */

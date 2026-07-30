@@ -25,7 +25,7 @@ export async function GET(request: Request) {
       ];
     }
 
-    const customers = await prisma.tmsCustomer.findMany({
+    const rows = await prisma.tmsCustomer.findMany({
       where,
       orderBy: { name: "asc" },
       take: 500,
@@ -33,6 +33,17 @@ export async function GET(request: Request) {
         _count: { select: { loads: true, invoices: true } },
       },
     });
+
+    const customers = rows.map((c) => ({
+      ...c,
+      status: c.isActive ? "active" : "inactive",
+      creditLimit: null as number | null,
+      billingAddress: [c.address, c.city, c.state, c.zip].filter(Boolean).join(", "),
+      // UI historically called .replace on a string; expose both
+      paymentTermsLabel: `Net ${c.paymentTerms}`,
+      loadCount: c._count.loads,
+      invoiceCount: c._count.invoices,
+    }));
 
     return NextResponse.json({ customers });
   } catch (error) {

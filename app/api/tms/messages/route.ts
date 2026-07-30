@@ -3,6 +3,13 @@ import { prisma } from "@/src/lib/prisma";
 import { requireModule } from "@/src/lib/auth";
 import { handleApiError } from "@/src/lib/api";
 
+function driverDisplayName(driver: {
+  firstName?: string | null;
+  lastName?: string | null;
+}) {
+  return [driver.firstName, driver.lastName].filter(Boolean).join(" ").trim() || "Driver";
+}
+
 export async function GET(request: Request) {
   try {
     const { companyId } = await requireModule("tms");
@@ -14,14 +21,19 @@ export async function GET(request: Request) {
       const where: Record<string, unknown> = { companyId, driverId };
       if (loadId) where.loadId = loadId;
 
-      const messages = await prisma.tmsMessage.findMany({
+      const rows = await prisma.tmsMessage.findMany({
         where,
         orderBy: { createdAt: "asc" },
-        include: {
-          driver: { select: { id: true, firstName: true, lastName: true } },
-          load: { select: { id: true, loadNumber: true } },
-        },
       });
+
+      const messages = rows.map((m) => ({
+        id: m.id,
+        body: m.body,
+        sender: m.direction === "inbound" ? "driver" : "dispatcher",
+        direction: m.direction,
+        createdAt: m.createdAt,
+        loadId: m.loadId,
+      }));
 
       return NextResponse.json({ messages });
     }
@@ -53,24 +65,25 @@ export async function GET(request: Request) {
         ]);
 
         return {
-          driver,
-          latestMessage: latest,
+          id: driver.id,
+          driverId: driver.id,
+          driverName: driverDisplayName(driver),
+          lastMessage: latest?.body ?? "",
+          lastMessageAt: latest?.createdAt?.toISOString() ?? null,
           unreadCount,
+          hasMessages: Boolean(latest),
         };
-      })
+      }),
     );
 
-    const sorted = conversations
-      .filter((c) => c.latestMessage)
-      .sort(
-        (a, b) =>
-          (b.latestMessage?.createdAt.getTime() ?? 0) -
-          (a.latestMessage?.createdAt.getTime() ?? 0)
-      );
+    conversations.sort((a, b) => {
+      if (a.hasMessages !== b.hasMessages) return a.hasMessages ? -1 : 1;
+      return (b.lastMessageAt ?? "").localeCompare(a.lastMessageAt ?? "");
+    });
 
-    const withoutMessages = conversations.filter((c) => !c.latestMessage);
-
-    return NextResponse.json({ conversations: [...sorted, ...withoutMessages] });
+    return NextResponse.json({
+      conversations: conversations.map(({ hasMessages: _, ...rest }) => rest),
+    });
   } catch (error) {
     return handleApiError(error);
   }
@@ -120,13 +133,21 @@ export async function POST(request: Request) {
         attachmentName: String(body.attachmentName ?? "").trim(),
         attachmentData: String(body.attachmentData ?? ""),
       },
-      include: {
-        driver: { select: { id: true, firstName: true, lastName: true } },
-        load: { select: { id: true, loadNumber: true } },
-      },
     });
 
-    return NextResponse.json({ message }, { status: 201 });
+    return NextResponse.json(
+      {
+        message: {
+          id: message.id,
+          body: message.body,
+          sender: direction === "inbound" ? "driver" : "dispatcher",
+          direction,
+          createdAt: message.createdAt,
+          loadId: message.loadId,
+        },
+      },
+      { status: 201 },
+    );
   } catch (error) {
     return handleApiError(error);
   }

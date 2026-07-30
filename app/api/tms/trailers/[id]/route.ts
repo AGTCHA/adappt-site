@@ -21,7 +21,14 @@ export async function PATCH(request: Request, context: Ctx) {
 
     const data: Record<string, unknown> = {};
     if (body.name !== undefined) data.name = String(body.name).trim();
-    if (body.trailerNumber !== undefined) data.trailerNumber = String(body.trailerNumber).trim();
+    if (body.unitNumber !== undefined) {
+      const unit = String(body.unitNumber).trim();
+      data.name = unit;
+      data.trailerNumber = unit;
+    }
+    if (body.trailerNumber !== undefined) {
+      data.trailerNumber = String(body.trailerNumber).trim();
+    }
     if (body.type !== undefined) {
       data.type = (EQUIPMENT_TYPES as readonly string[]).includes(String(body.type))
         ? String(body.type)
@@ -33,11 +40,19 @@ export async function PATCH(request: Request, context: Ctx) {
     if (body.vin !== undefined) data.vin = String(body.vin).trim();
     if (body.licensePlate !== undefined) data.licensePlate = String(body.licensePlate).trim();
     if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
+    if (body.status !== undefined) data.isActive = body.status !== "inactive";
 
-    const trailer = await prisma.tmsTrailer.update({
+    const updated = await prisma.tmsTrailer.update({
       where: { id },
       data,
     });
+
+    const trailer = {
+      ...updated,
+      unitNumber: updated.trailerNumber || updated.name,
+      status: updated.isActive ? "active" : "inactive",
+      length: null as number | null,
+    };
 
     return NextResponse.json({ trailer });
   } catch (error) {

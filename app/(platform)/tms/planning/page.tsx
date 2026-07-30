@@ -82,8 +82,8 @@ export default function PlanningPage() {
     const q = search.toLowerCase();
     return data.filter(
       (d) =>
-        d.firstName.toLowerCase().includes(q) ||
-        d.lastName.toLowerCase().includes(q)
+        (d.firstName ?? "").toLowerCase().includes(q) ||
+        (d.lastName ?? "").toLowerCase().includes(q)
     );
   }, [data, search]);
 

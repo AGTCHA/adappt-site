@@ -82,7 +82,7 @@ export default function TmsMessagesPage() {
 
   const filteredConversations = conversations?.filter((c) => {
     if (!search.trim()) return true;
-    return c.driverName.toLowerCase().includes(search.toLowerCase());
+    return (c.driverName ?? "").toLowerCase().includes(search.toLowerCase());
   });
 
   const selectedConversation = conversations?.find((c) => c.driverId === selectedId);
@@ -132,11 +132,13 @@ export default function TmsMessagesPage() {
                     }`}
                   >
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-bold text-accent">
-                      {conv.driverName.charAt(0)}
+                      {(conv.driverName ?? "?").charAt(0)}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
-                        <p className="truncate text-sm font-semibold">{conv.driverName}</p>
+                        <p className="truncate text-sm font-semibold">
+                          {conv.driverName || "Driver"}
+                        </p>
                         {conv.unreadCount > 0 && (
                           <Badge tone="accent">{conv.unreadCount}</Badge>
                         )}

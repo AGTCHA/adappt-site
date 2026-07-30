@@ -31,7 +31,7 @@ export async function GET(request: Request) {
       ];
     }
 
-    const invoices = await prisma.tmsInvoice.findMany({
+    const rows = await prisma.tmsInvoice.findMany({
       where,
       orderBy: { createdAt: "desc" },
       take: 500,
@@ -43,15 +43,33 @@ export async function GET(request: Request) {
             origin: true,
             destination: true,
             status: true,
+            customerName: true,
           },
         },
         customer: {
           select: { id: true, name: true, contactEmail: true },
         },
         lineItems: { orderBy: { sortOrder: "asc" } },
+        payments: { orderBy: { paymentDate: "desc" }, take: 20 },
         _count: { select: { payments: true } },
       },
     });
+
+    const invoices = rows.map((inv) => ({
+      ...inv,
+      totalAmount: inv.total,
+      balanceDue: inv.balance,
+      customerName: inv.customer?.name ?? inv.billToName ?? inv.load?.customerName ?? "",
+      loadNumber: inv.load?.loadNumber ?? "",
+      lineItems: inv.lineItems.map((li) => ({
+        ...li,
+        unitPrice: li.rate,
+      })),
+      payments: inv.payments.map((p) => ({
+        ...p,
+        paidAt: p.paymentDate,
+      })),
+    }));
 
     return NextResponse.json({ invoices });
   } catch (error) {

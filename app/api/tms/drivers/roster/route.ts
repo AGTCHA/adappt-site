@@ -11,19 +11,19 @@ export async function GET(request: Request) {
 
     const where: Record<string, unknown> = { companyId };
     if (!includeArchived) {
-      where.OR = [
-        { status: { in: ["active", "hired", "applicant", "orientation"] } },
-        { archivedAt: null },
-      ];
+      where.archivedAt = null;
+      where.status = { in: ["active", "hired"] };
     }
 
     const drivers = await prisma.driver.findMany({
       where,
       orderBy: { lastName: "asc" },
       include: {
-        truck: { select: { id: true, unitNumber: true, year: true, make: true, model: true } },
+        truck: {
+          select: { id: true, unitNumber: true, year: true, make: true, model: true },
+        },
         tmsLoads: {
-          where: { status: { in: ["assigned", "in_transit"] } },
+          where: { status: { in: ["assigned", "in_transit", "pending"] } },
           orderBy: { pickupDate: "desc" },
           take: 1,
           select: {
@@ -36,31 +36,41 @@ export async function GET(request: Request) {
             deliveryDate: true,
           },
         },
-        _count: {
-          select: { tmsSettlements: true },
-        },
+        _count: { select: { tmsSettlements: true } },
       },
     });
 
-    const roster = drivers.map((d) => ({
-      id: d.id,
-      firstName: d.firstName,
-      lastName: d.lastName,
-      phone: d.phone,
-      email: d.email,
-      status: d.status,
-      driverType: d.driverType,
-      city: d.city,
-      state: d.state,
-      cdlNumber: d.cdlNumber,
-      cdlState: d.cdlState,
-      cdlExpiry: d.cdlExpiry,
-      medCardExpiry: d.medCardExpiry,
-      archivedAt: d.archivedAt,
-      truck: d.truck,
-      currentLoad: d.tmsLoads[0] ?? null,
-      settlementCount: d._count.tmsSettlements,
-    }));
+    const roster = drivers.map((d) => {
+      const currentLoad = d.tmsLoads[0] ?? null;
+      const onLoad = Boolean(
+        currentLoad && ["assigned", "in_transit"].includes(currentLoad.status),
+      );
+      return {
+        id: d.id,
+        firstName: d.firstName ?? "",
+        lastName: d.lastName ?? "",
+        phone: d.phone ?? "",
+        email: d.email ?? "",
+        status: d.status,
+        type: d.driverType || "company",
+        driverType: d.driverType || "company",
+        city: d.city ?? "",
+        // US state code for profile; dispatch availability is separate
+        state: onLoad ? "on_load" : "available",
+        region: d.state ?? "",
+        dispatcher: d.dispatcherName || null,
+        location: currentLoad
+          ? currentLoad.origin || currentLoad.destination || null
+          : null,
+        hosRemaining: null,
+        currentLoadId: currentLoad?.id ?? null,
+        currentLoadNumber: currentLoad?.loadNumber ?? null,
+        truckUnitNumber: d.truck?.unitNumber ?? null,
+        truck: d.truck,
+        currentLoad,
+        settlementCount: d._count.tmsSettlements,
+      };
+    });
 
     return NextResponse.json({ drivers: roster });
   } catch (error) {
